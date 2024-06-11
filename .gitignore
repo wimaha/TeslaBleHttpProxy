@@ -20,3 +20,8 @@
 # Go workspace file
 go.work
 go.work.sum
+
+key/private.pem
+key/public.pem
+
+.DS_Store
