@@ -1,6 +1,8 @@
 # TeslaBleHttpProxy
 
-TeslaBleHttpProxy is a program written in Go that receives HTTP requests and forwards them via Bluetooth to a Tesla vehicle. The program can, for example, be easily used together with evcc.
+TeslaBleHttpProxy is a program written in Go that receives HTTP requests and forwards them via Bluetooth to a Tesla vehicle. The program can, for example, be easily used together with [evcc](https://github.com/evcc-io/evcc).
+
+The program stores the received requests in a queue and processes them one by one. This ensures that only one Bluetooth connection to the vehicle is established at a time.
 
 ## Table of Contents
 
@@ -46,6 +48,58 @@ services:
 Please ensure that you specify the folder containing the private.key correctly. In this example, it is `~/TeslaBleHttpProxy/key`.
 
 ## Generate key for vehicle
+
+You can generate the required keys using the following steps. For more information, see also the documentation of the [Tesla Vehicle Command SDK](https://github.com/teslamotors/vehicle-command/blob/main/cmd/tesla-control/README.md).
+
+```
+git clone https://github.com/teslamotors/vehicle-command.git
+cd vehicle-command
+go get ./...
+go build ./...
+go install ./...
+openssl ecparam -genkey -name prime256v1 -noout > private.pem
+openssl ec -in private.pem -pubout > public.pem
+sudo setcap 'cap_net_admin=eip' "$(which tesla-control)"
+tesla-control -vin YOUR_VIN -ble add-key-request public.pem owner cloud_key
+```
+
+## Setup EVCC
+
+Below is a sample configuration of a custom vehicle in evcc:
+
+```
+vehicles:
+  - name: model3
+    type: custom
+    title: Tesla Model 3
+    capacity: 60
+    chargeenable:
+      source: http
+      uri: "http://IP:8080/api/1/vehicles/VIN/command/{{if .chargeenable}}charge_start{{else}}charge_stop{{end}}"
+      method: POST
+      body: ""
+    maxcurrent: # set charger max current (A)
+      source: http
+      uri: http://IP:8080/api/1/vehicles/VIN/command/set_charging_amps
+      method: POST
+      body: '{"charging_amps": "{{.maxcurrent}}"}'
+    wakeup: # vehicle wake up command
+      source: http
+      uri: http://IP:8080/api/1/vehicles/VIN/command/wake_up
+      method: POST
+      body: ""
+    soc:
+      source: [Your Source ...]
+    range:
+      source: [Your Source ...]
+    status:
+      source: combined
+      plugged:
+        source: [Your Source ...]
+      charging:
+        source: [Your Source ...]
+```
+
 
 
 
