@@ -59,9 +59,9 @@ func (s *Stack) Pop() (Command, bool) {
 	if s.IsEmpty() {
 		return Command{}, true
 	} else {
-		index := len(*s) - 1   // Get the index of the top most element.
+		index := 0             // Get the index of the top most element.
 		element := (*s)[index] // Index into the slice and obtain the element.
-		*s = (*s)[:index]      // Remove it from the stack by slicing it off.
+		*s = (*s)[index+1:]    // Remove it from the stack by slicing it off.
 		return element, false
 	}
 }
@@ -131,6 +131,7 @@ func loop() {
 		time.Sleep(1 * time.Second)
 		command, empty := currentCommands.Pop()
 		if !empty {
+			//log.Printf("Command: %s", command.Command)
 			handleCommand(command)
 		}
 	}
