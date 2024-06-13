@@ -11,6 +11,7 @@ The program stores the received requests in a queue and processes them one by on
   - [Docker compose](#docker-compose)
 - [Generate key for vehicle](#generate-key-for-vehicle)
 - [Setup EVCC](#setup-evcc)
+- [API](#api)
 
 ## How to install
 
@@ -100,6 +101,15 @@ vehicles:
         source: [Your Source ...]
 ```
 
+## API
+
+The program uses the same interfaces as the Tesla [Fleet API](https://developer.tesla.com/docs/fleet-api#vehicle-commands). Currently, the following requests are supported: 
+
+- wake_up
+- charge_start
+- charge_stop
+- set_charging_amps
+- flash_lights
 
 
 
