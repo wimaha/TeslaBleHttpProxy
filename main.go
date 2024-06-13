@@ -30,9 +30,41 @@ type Response struct {
 	Command string `json:"command"`
 }
 
+type Command struct {
+	Command string
+	Vin     string
+	Body    map[string]interface{}
+}
+
 var privateKeyFile = "key/private.pem"
 
 var exceptedCommands = []string{"flash_lights", "wake_up", "set_charging_amps", "charge_start", "charge_stop", "session_info"}
+
+type Stack []Command
+
+var currentCommands Stack
+
+// IsEmpty: check if stack is empty
+func (s *Stack) IsEmpty() bool {
+	return len(*s) == 0
+}
+
+// Push a new value onto the stack
+func (s *Stack) Push(str Command) {
+	*s = append(*s, str) // Simply append the new value to the end of the stack
+}
+
+// Remove and return top element of stack. Return true if stack is empty.
+func (s *Stack) Pop() (Command, bool) {
+	if s.IsEmpty() {
+		return Command{}, true
+	} else {
+		index := len(*s) - 1   // Get the index of the top most element.
+		element := (*s)[index] // Index into the slice and obtain the element.
+		*s = (*s)[:index]      // Remove it from the stack by slicing it off.
+		return element, false
+	}
+}
 
 func main() {
 	log.Println("TeslaBleHttpProxy is loading ...")
@@ -40,24 +72,22 @@ func main() {
 
 	router := mux.NewRouter()
 
+	go loop()
+
 	// Define the endpoints
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
-	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", handleCommand).Methods("POST")
+	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
 
 	log.Println("TeslaBleHttpProxy is running!")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-func handleCommand(w http.ResponseWriter, r *http.Request) {
+func receiveCommand(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := params["command"]
 
-	log.Printf("Command: %s (VIN: %s)", command, vin)
-
 	var response Response
-	//response.Result = true
-	//response.Reason = ""
 	response.Vin = vin
 	response.Command = command
 
@@ -65,17 +95,18 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		var ret Ret
 		ret.Response = response
 
-		if response.Result {
-			log.Printf("The command \"%s\" was successfully executed.\n", command)
-		} else {
-			log.Printf("The command \"%s\" was canceled:\n", command)
-			log.Printf("[Error]%s\n", response.Reason)
-		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(ret)
 	}()
+
+	//Body
+	var body map[string]interface{} = nil
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
+		log.Printf("Error decoding body: %s.\n", err)
+	}
+
+	log.Printf("received command \"%s\" (VIN: %s) with body: %s\n", command, vin, body)
 
 	if !slices.Contains(exceptedCommands, command) {
 		log.Printf("The command \"%s\" is not supported.\n", command)
@@ -84,12 +115,44 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//Body
-	var body map[string]interface{} = nil
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
-		log.Printf("Error decoding body: %s.\n", err)
+	var newCommand Command
+	newCommand.Vin = vin
+	newCommand.Command = command
+	newCommand.Body = body
+
+	currentCommands.Push(newCommand)
+
+	response.Result = true
+	response.Reason = "The command was successfully received and will be processed shortly."
+}
+
+func loop() {
+	for {
+		time.Sleep(1 * time.Second)
+		command, empty := currentCommands.Pop()
+		if !empty {
+			handleCommand(command)
+		}
 	}
-	log.Printf("%s\n", body)
+}
+
+func handleCommand(command Command) {
+	log.Printf("handle command: %s (VIN: %s)", command.Command, command.Vin)
+
+	var response Response
+	//response.Result = true
+	//response.Reason = ""
+	response.Vin = command.Vin
+	response.Command = command.Command
+
+	defer func() {
+		if response.Result {
+			log.Printf("The command \"%s\" was successfully executed.\n", command.Command)
+		} else {
+			log.Printf("The command \"%s\" was canceled:\n", command.Command)
+			log.Printf("[Error]%s\n", response.Reason)
+		}
+	}()
 
 	var err error
 	var retry bool
@@ -112,7 +175,7 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(sleep)
 			sleep *= 2
 		}
-		retry, err = executeCommand(body, command, vin, privateKey)
+		retry, err = executeCommand(command.Body, command.Command, command.Vin, privateKey)
 		if err == nil {
 			//Successful
 			response.Result = true
@@ -224,6 +287,6 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 		fmt.Printf("%s\n", info)
 	}
 
-	// should never go here
-	return false, fmt.Errorf("should never go here")
+	// everything fine
+	return false, nil
 }
