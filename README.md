@@ -26,6 +26,8 @@ go build .
 ./TeslaBleHttpProxy
 ```
 
+Be sure to add the `private.pem` in a folder called `key`.
+
 ### Docker compose
 
 Below you will find the necessary contents for your `docker-compose.yml`:
@@ -46,7 +48,7 @@ services:
       - SYS_ADMIN
 ```
 
-Please ensure that you specify the folder containing the private.key correctly. In this example, it is `~/TeslaBleHttpProxy/key`.
+Please ensure that you specify the folder containing the `private.pem` correctly. In this example, it is `~/TeslaBleHttpProxy/key`.
 
 ## Generate key for vehicle
 
