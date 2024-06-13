@@ -12,7 +12,7 @@ COPY . .
 RUN go get -d -v
 # Build the binary.
 #RUN go build -o /go/bin/teslaBleHttpProxy
-RUN GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
+RUN GOOS=linux go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
 #RUN sudo setcap 'cap_net_admin=eip' "/go/bin/teslaBleHttpProxy"
 RUN mkdir -p /go/bin/key
 ############################
