@@ -55,22 +55,22 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Command: %s (VIN: %s)", command, vin)
 
-	//Body
-	var body map[string]interface{} = nil
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" {
-		log.Printf("Error decoding body: %s.\n", err)
-	}
-	log.Printf("%s\n", body)
-
 	var response Response
-	response.Result = true
-	response.Reason = ""
+	//response.Result = true
+	//response.Reason = ""
 	response.Vin = vin
 	response.Command = command
 
 	defer func() {
 		var ret Ret
 		ret.Response = response
+
+		if response.Result {
+			log.Printf("The command \"%s\" was successfully executed.\n", command)
+		} else {
+			log.Printf("The command \"%s\" was canceled:\n", command)
+			log.Printf("[Error]%s\n", response.Reason)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
@@ -84,12 +84,15 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For simplcity, allow 30 seconds to wake up the vehicle, connect to it,
-	// and unlock. In practice you'd want a fresh timeout for each command.
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	//Body
+	var body map[string]interface{} = nil
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
+		log.Printf("Error decoding body: %s.\n", err)
+	}
+	log.Printf("%s\n", body)
 
 	var err error
+	var retry bool
 	var privateKey protocol.ECDHPrivateKey
 	if privateKeyFile != "" {
 		if privateKey, err = protocol.LoadPrivateKey(privateKeyFile); err != nil {
@@ -100,36 +103,58 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var sleep = 3 * time.Second
+	//Retry max 3 Times
+	for i := 0; i < 3; i++ {
+		if i > 0 {
+			log.Printf("[Error]%s\n", err)
+			log.Printf("retrying in %d seconds", sleep/time.Second)
+			time.Sleep(sleep)
+			sleep *= 2
+		}
+		retry, err = executeCommand(body, command, vin, privateKey)
+		if err == nil {
+			//Successful
+			response.Result = true
+			response.Reason = ""
+			return
+		} else if !retry {
+			//Failed but no retry possible
+			response.Result = false
+			response.Reason = err.Error()
+			return
+		}
+	}
+	response.Result = false
+	response.Reason = err.Error()
+	log.Printf("stop retrying after 3 attempts")
+}
+
+// returns bool retry and error or nil if successful
+func executeCommand(body map[string]interface{}, command string, vin string, privateKey protocol.ECDHPrivateKey) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	log.Printf("Connecting to vehicle...\n")
 	conn, err := ble.NewConnection(ctx, vin)
 	if err != nil {
-		log.Printf("Failed to connect to vehicle (A): %s\n", err)
-		response.Reason = fmt.Sprintf("Failed to connect to vehicle (A): %s", err)
-		response.Result = false
-
 		if strings.Contains(err.Error(), "operation not permitted") {
 			// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
 			// heavy-handed way of dealing with devices that are in a bad state.
-			log.Printf("Try again after granting this application CAP_NET_ADMIN:\n\n\tsudo setcap 'cap_net_admin=eip' \"$(which %s)\"\n", os.Args[0])
-			response.Reason = fmt.Sprintf("Failed to connect to vehicle (A): %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
+			return false, fmt.Errorf("failed to connect to vehicle (A): %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
+		} else {
+			return true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 		}
-
-		return
 	}
 	defer conn.Close()
 
 	car, err := vehicle.NewVehicle(conn, privateKey, nil)
 	if err != nil {
-		log.Printf("Failed to connect to vehicle (B): %s\n", err)
-		response.Reason = fmt.Sprintf("Failed to connect to vehicle (B): %s", err)
-		response.Result = false
-		return
+		return true, fmt.Errorf("failed to connect to vehicle (B): %s", err)
 	}
 
 	if err := car.Connect(ctx); err != nil {
-		log.Printf("Failed to connect to vehicle (C): %s\n", err)
-		response.Reason = fmt.Sprintf("Failed to connect to vehicle (C): %s", err)
-		response.Result = false
-		return
+		return true, fmt.Errorf("failed to connect to vehicle (C): %s", err)
 	}
 	defer car.Disconnect()
 
@@ -142,78 +167,63 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	// StartSession() performs a handshake with the vehicle that allows
 	// subsequent commands to be authenticated.
 	if err := car.StartSession(ctx, domains); err != nil {
-		log.Printf("Failed to perform handshake with vehicle: %s\n", err)
-		response.Reason = fmt.Sprintf("Failed to perform handshake with vehicle: %s", err)
-		response.Result = false
-		return
+		if strings.Contains(err.Error(), "context deadline exceeded") {
+			//try wakeup vehicle
+			log.Printf("try wakeup vehicle...\n")
+			if _, err = executeCommand(body, "wake_up", vin, privateKey); err == nil {
+				//vehicle wakeup successful
+				log.Printf("wakeup successful!\n")
+				if err := car.StartSession(ctx, domains); err != nil {
+					return true, fmt.Errorf("failed to perform handshake with vehicle: %s", err)
+				}
+			}
+		}
+		return true, fmt.Errorf("failed to perform handshake with vehicle: %s", err)
 	}
 
+	log.Printf("sending command \"%s\"...", command)
 	switch command {
 	case "flash_lights":
 		if err := car.FlashLights(ctx); err != nil {
-			log.Printf("Failed to flash lights: %s:\n", err)
-			response.Reason = fmt.Sprintf("Failed to flash lights: %s", err)
-			response.Result = false
-			return
+			return true, fmt.Errorf("failed to flash lights: %s", err)
 		}
 	case "wake_up":
 		if err := car.Wakeup(ctx); err != nil {
-			log.Printf("Failed to wake up car: %s:\n", err)
-			response.Reason = fmt.Sprintf("Failed to wake up car: %s", err)
-			response.Result = false
-			return
+			return true, fmt.Errorf("failed to wake up car: %s", err)
 		}
 	case "charge_start":
 		if err := car.ChargeStart(ctx); err != nil {
-			log.Printf("Failed to start charge: %s:\n", err)
-			response.Reason = fmt.Sprintf("Failed to start charge: %s", err)
-			response.Result = false
-			return
+			return true, fmt.Errorf("failed to start charge: %s", err)
 		}
 	case "charge_stop":
 		if err := car.ChargeStop(ctx); err != nil {
-			log.Printf("Failed to stop charge: %s:\n", err)
-			response.Reason = fmt.Sprintf("Failed to stop charge: %s", err)
-			response.Result = false
-			return
+			return true, fmt.Errorf("failed to stop charge: %s", err)
 		}
 	case "set_charging_amps":
 		if chargingAmpsString, ok := body["charging_amps"].(string); ok {
 			if chargingAmps, err := strconv.ParseInt(chargingAmpsString, 10, 32); err == nil {
 				if err := car.SetChargingAmps(ctx, int32(chargingAmps)); err != nil {
-					log.Printf("Failed to set charging Amps to %d: %s\n", chargingAmps, err)
-					response.Reason = fmt.Sprintf("Failed to set charging Amps to %d: %s", chargingAmps, err)
-					response.Result = false
-					return
+					return true, fmt.Errorf("failed to set charging Amps to %d: %s", chargingAmps, err)
 				}
 			} else {
-				log.Printf("Charing Amps parsing error: %s\n", err)
-				response.Reason = fmt.Sprintf("Charing Amps parsing error: %s", err)
-				response.Result = false
-				return
+				return false, fmt.Errorf("charing Amps parsing error: %s", err)
 			}
 		} else {
-			log.Printf("Charing Amps missing in body\n")
-			response.Reason = "Charing Amps missing in body"
-			response.Result = false
-			return
+			return false, fmt.Errorf("charing Amps missing in body")
 		}
 	case "session_info":
 		publicKey, err := protocol.LoadPublicKey("key/public.pem")
 		if err != nil {
-			log.Printf("Failed to load public key: %s\n", err)
-			response.Reason = fmt.Sprintf("Failed to load public key: %s", err)
-			response.Result = false
-			return
+			return false, fmt.Errorf("failed to load public key: %s", err)
 		}
 
 		info, err := car.SessionInfo(ctx, publicKey, protocol.DomainVCSEC)
 		if err != nil {
-			log.Printf("Failed session_info: %s:\n", err)
-			response.Reason = fmt.Sprintf("Failed session_info: %s", err)
-			response.Result = false
-			return
+			return true, fmt.Errorf("failed session_info: %s", err)
 		}
 		fmt.Printf("%s\n", info)
 	}
+
+	// should never go here
+	return false, fmt.Errorf("should never go here")
 }
