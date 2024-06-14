@@ -54,6 +54,11 @@ func (s *Stack) Push(str Command) {
 	*s = append(*s, str) // Simply append the new value to the end of the stack
 }
 
+// Prepend to Stack
+func (s *Stack) Prepend(str Command) {
+	*s = append([]Command{str}, *s...)
+}
+
 // Remove and return top element of stack. Return true if stack is empty.
 func (s *Stack) Pop() (Command, bool) {
 	if s.IsEmpty() {
@@ -168,8 +173,13 @@ func handleCommand(command Command) {
 	}
 
 	var sleep = 3 * time.Second
+	var retryCount = 3
+	if command.Command == "charge_start" || command.Command == "charge_stop" {
+		retryCount = 6
+	}
+
 	//Retry max 3 Times
-	for i := 0; i < 3; i++ {
+	for i := 0; i < retryCount; i++ {
 		if i > 0 {
 			log.Printf("[Error]%s\n", err)
 			log.Printf("retrying in %d seconds", sleep/time.Second)
@@ -234,13 +244,9 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 		if strings.Contains(err.Error(), "context deadline exceeded") {
 			//try wakeup vehicle
 			log.Printf("try wakeup vehicle...\n")
-			if _, err = executeCommand(body, "wake_up", vin, privateKey); err == nil {
-				//vehicle wakeup successful
-				log.Printf("wakeup successful!\n")
-				if err := car.StartSession(ctx, domains); err != nil {
-					return true, fmt.Errorf("failed to perform handshake with vehicle: %s", err)
-				}
-			}
+			currentCommands.Prepend(Command{Command: command, Vin: vin, Body: body})
+			currentCommands.Prepend(Command{Command: "wake_up", Vin: vin})
+			return false, fmt.Errorf("vehicle sleeps! trying wakeup vehicle... command will be processed again")
 		}
 		return true, fmt.Errorf("failed to perform handshake with vehicle: %s", err)
 	}
