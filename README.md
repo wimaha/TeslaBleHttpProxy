@@ -68,7 +68,7 @@ tesla-control -vin YOUR_VIN -ble add-key-request public.pem owner cloud_key
 
 ## Setup EVCC
 
-***Attention: Currently the custom vehicle config only works on evcc version 0.126.6 (`image: evcc/evcc:0.126.6`)***
+***Attention: You have to use at least version 0.127.2 or newer of evcc***
 Below is a sample configuration of a custom vehicle in evcc:
 
 ```
