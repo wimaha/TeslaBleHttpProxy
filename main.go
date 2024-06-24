@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/log"
 
 	"github.com/gorilla/mux"
 	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
@@ -72,8 +73,7 @@ func (s *Stack) Pop() (Command, bool) {
 }
 
 func main() {
-	log.Println("TeslaBleHttpProxy is loading ...")
-	//log.Println("Config loading ...")
+	log.Info("TeslaBleHttpProxy is loading ...")
 
 	router := mux.NewRouter()
 
@@ -81,11 +81,17 @@ func main() {
 
 	// Define the endpoints
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
+	//router.NotFoundHandler = router.NewRoute().HandlerFunc(testR).GetHandler()
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
+	//router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("GET")
 
-	log.Println("TeslaBleHttpProxy is running!")
+	log.Info("TeslaBleHttpProxy is running!")
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
+
+/*func testR(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[%s]%s\n", r.Method, r.URL)
+}*/
 
 func receiveCommand(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
@@ -108,13 +114,13 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 	//Body
 	var body map[string]interface{} = nil
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
-		log.Printf("Error decoding body: %s.\n", err)
+		log.Error("decoding body", "err", err)
 	}
 
-	log.Printf("received command \"%s\" (VIN: %s) with body: %s\n", command, vin, body)
+	log.Info("received command", "command", command, "VIN", vin, "body", body)
 
 	if !slices.Contains(exceptedCommands, command) {
-		log.Printf("The command \"%s\" is not supported.\n", command)
+		log.Error("The command is not supported.", "command", command)
 		response.Reason = fmt.Sprintf("The command \"%s\" is not supported.", command)
 		response.Result = false
 		return
@@ -136,14 +142,13 @@ func loop() {
 		time.Sleep(1 * time.Second)
 		command, empty := currentCommands.Pop()
 		if !empty {
-			//log.Printf("Command: %s", command.Command)
 			handleCommand(command)
 		}
 	}
 }
 
 func handleCommand(command Command) {
-	log.Printf("handle command: %s (VIN: %s)", command.Command, command.Vin)
+	log.Info("handle command", "command", command.Command, "VIN", command.Vin)
 
 	var response Response
 	//response.Result = true
@@ -153,10 +158,9 @@ func handleCommand(command Command) {
 
 	defer func() {
 		if response.Result {
-			log.Printf("The command \"%s\" was successfully executed.\n", command.Command)
+			log.Info("The command was successfully executed.", "command", command.Command)
 		} else {
-			log.Printf("The command \"%s\" was canceled:\n", command.Command)
-			log.Printf("[Error]%s\n", response.Reason)
+			log.Error("The command was canceled.", "command", command.Command, "err", response.Reason)
 		}
 	}()
 
@@ -165,7 +169,7 @@ func handleCommand(command Command) {
 	var privateKey protocol.ECDHPrivateKey
 	if privateKeyFile != "" {
 		if privateKey, err = protocol.LoadPrivateKey(privateKeyFile); err != nil {
-			log.Printf("Failed to load private key: %s\n", err)
+			log.Error("Failed to load private key.", "err", err)
 			response.Reason = fmt.Sprintf("Failed to load private key: %s", err)
 			response.Result = false
 			return
@@ -181,8 +185,8 @@ func handleCommand(command Command) {
 	//Retry max 3 Times
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
-			log.Printf("[Error]%s\n", err)
-			log.Printf("retrying in %d seconds", sleep/time.Second)
+			log.Warn(err)
+			log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
 			time.Sleep(sleep)
 			sleep *= 2
 		}
@@ -201,7 +205,7 @@ func handleCommand(command Command) {
 	}
 	response.Result = false
 	response.Reason = err.Error()
-	log.Printf("stop retrying after 3 attempts")
+	log.Error(fmt.Sprintf("stop retrying after %d attempts", retryCount))
 }
 
 // returns bool retry and error or nil if successful
@@ -209,7 +213,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Printf("Connecting to vehicle...\n")
+	log.Debug("Connecting to vehicle...")
 	conn, err := ble.NewConnection(ctx, vin)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
@@ -243,7 +247,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 	if err := car.StartSession(ctx, domains); err != nil {
 		if strings.Contains(err.Error(), "context deadline exceeded") {
 			//try wakeup vehicle
-			log.Printf("try wakeup vehicle...\n")
+			log.Debug("try wakeup vehicle...")
 			currentCommands.Prepend(Command{Command: command, Vin: vin, Body: body})
 			currentCommands.Prepend(Command{Command: "wake_up", Vin: vin})
 			return false, fmt.Errorf("vehicle sleeps! trying wakeup vehicle... command will be processed again")
@@ -251,7 +255,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 		return true, fmt.Errorf("failed to perform handshake with vehicle: %s", err)
 	}
 
-	log.Printf("sending command \"%s\"...", command)
+	log.Debug("sending command ...", "command", command)
 	switch command {
 	case "flash_lights":
 		if err := car.FlashLights(ctx); err != nil {
