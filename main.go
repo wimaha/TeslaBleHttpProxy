@@ -75,6 +75,12 @@ func (s *Stack) Pop() (Command, bool) {
 func main() {
 	log.Info("TeslaBleHttpProxy is loading ...")
 
+	envLogLevel := os.Getenv("logLevel")
+	if envLogLevel == "debug" {
+		log.SetLevel(log.DebugLevel)
+		log.Debug("LogLevel set to debug")
+	}
+
 	router := mux.NewRouter()
 
 	go loop()
@@ -175,6 +181,7 @@ func handleCommand(command Command) {
 			return
 		}
 	}
+	log.Debug("PrivateKeyFile loaded")
 
 	var sleep = 3 * time.Second
 	var retryCount = 3
@@ -190,6 +197,7 @@ func handleCommand(command Command) {
 			time.Sleep(sleep)
 			sleep *= 2
 		}
+		log.Debug("call executeCommand", "command", command.Command)
 		retry, err = executeCommand(command.Body, command.Command, command.Vin, privateKey)
 		if err == nil {
 			//Successful
@@ -213,7 +221,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Debug("Connecting to vehicle...")
+	log.Debug("Connecting to bluetooth adapter ...")
 	conn, err := ble.NewConnection(ctx, vin)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
@@ -226,11 +234,13 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 	}
 	defer conn.Close()
 
+	log.Debug("Create vehicle object ...")
 	car, err := vehicle.NewVehicle(conn, privateKey, nil)
 	if err != nil {
 		return true, fmt.Errorf("failed to connect to vehicle (B): %s", err)
 	}
 
+	log.Debug("Connecting to vehicle...")
 	if err := car.Connect(ctx); err != nil {
 		return true, fmt.Errorf("failed to connect to vehicle (C): %s", err)
 	}
@@ -244,6 +254,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 	// Most interactions with the car require an authenticated client.
 	// StartSession() performs a handshake with the vehicle that allows
 	// subsequent commands to be authenticated.
+	log.Debug("start session...")
 	if err := car.StartSession(ctx, domains); err != nil {
 		if strings.Contains(err.Error(), "context deadline exceeded") {
 			//try wakeup vehicle
