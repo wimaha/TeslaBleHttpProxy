@@ -6,11 +6,11 @@ services:
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus
-    #ports:
-    #  - 8080:8080
     restart: always
     privileged: true
     network_mode: host
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
+   # environment:
+   #   logLevel: debug
