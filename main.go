@@ -39,7 +39,7 @@ type Command struct {
 
 var privateKeyFile = "key/private.pem"
 
-var exceptedCommands = []string{"flash_lights", "wake_up", "set_charging_amps", "charge_start", "charge_stop", "session_info"}
+var exceptedCommands = []string{"flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
 
 type Stack []Command
 
@@ -295,6 +295,18 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 			}
 		} else {
 			return false, fmt.Errorf("charing Amps missing in body")
+		}
+	case "set_charge_limit":
+		if chargeLimitString, ok := body["percent"].(string); ok {
+			if chargeLimit, err := strconv.ParseInt(chargeLimitString, 10, 32); err == nil {
+				if err := car.ChangeChargeLimit(ctx, int32(chargeLimit)); err != nil {
+					return true, fmt.Errorf("failed to set charge limit to %d %%: %s", chargeLimit, err)
+				}
+			} else {
+				return false, fmt.Errorf("charge limit parsing error: %s", err)
+			}
+		} else {
+			return false, fmt.Errorf("charge limit missing in body")
 		}
 	case "session_info":
 		publicKey, err := protocol.LoadPublicKey("key/public.pem")
