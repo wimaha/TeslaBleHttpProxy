@@ -278,10 +278,20 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 		}
 	case "charge_start":
 		if err := car.ChargeStart(ctx); err != nil {
+			if strings.Contains(err.Error(), "is_charging") {
+				//The car is already charging, so the command is somehow successfully executed.
+				log.Info("the car is already charging")
+				return false, nil
+			}
 			return true, fmt.Errorf("failed to start charge: %s", err)
 		}
 	case "charge_stop":
 		if err := car.ChargeStop(ctx); err != nil {
+			if strings.Contains(err.Error(), "not_charging") {
+				//The car has already stopped charging, so the command is somehow successfully executed.
+				log.Info("the car has already stopped charging")
+				return false, nil
+			}
 			return true, fmt.Errorf("failed to stop charge: %s", err)
 		}
 	case "set_charging_amps":
