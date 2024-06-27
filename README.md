@@ -7,26 +7,15 @@ The program stores the received requests in a queue and processes them one by on
 ## Table of Contents
 
 - [How to install](#how-to-install)
-  - [Build yourself](#build-yourself)
   - [Docker compose](#docker-compose)
+  - [Build yourself](#build-yourself)
 - [Generate key for vehicle](#generate-key-for-vehicle)
 - [Setup EVCC](#setup-evcc)
 - [API](#api)
 
 ## How to install
 
-You can either compile and use the Go program yourself or install it in a Docker container.
-
-### Build yourself
-
-Download the code and save it in a folder named 'TeslaBleHttpProxy'. From there, you can easily compile the program.
-
-```
-go build .
-./TeslaBleHttpProxy
-```
-
-Be sure to add the `private.pem` in a folder called `key`.
+You can either compile and use the Go program yourself or install it in a Docker container. ([detailed instruction](https://github.com/wimaha/TeslaBleHttpProxy/blob/main/docs/installation.md))
 
 ### Docker compose
 
@@ -49,6 +38,17 @@ services:
 ```
 
 Please ensure that you specify the folder containing the `private.pem` correctly. In this example, it is `~/TeslaBleHttpProxy/key`.
+
+### Build yourself
+
+Download the code and save it in a folder named 'TeslaBleHttpProxy'. From there, you can easily compile the program.
+
+```
+go build .
+./TeslaBleHttpProxy
+```
+
+Be sure to add the `private.pem` in a folder called `key`.
 
 ## Generate key for vehicle
 
@@ -112,6 +112,7 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - charge_start
 - charge_stop
 - set_charging_amps
+- set_charge_limit
 - flash_lights
 
 
