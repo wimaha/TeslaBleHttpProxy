@@ -23,7 +23,7 @@ You can generate the required keys and send them to your tesla using the followi
 Download and install Go:
 ```
 sudo apt update && sudo apt install -y wget git build-essential
-wget https://go.dev/dl/go1.22.4.linux-armv6l.tar.gz
+wget https://dl.google.com/go/go1.22.1.linux-arm64.tar.gz
 tar -xvf go1.22.4.linux-armv6l.tar.gz
 mkdir -p ~/.local/share && mv go ~/.local/share
 export GOPATH=$HOME/.local/share/go
