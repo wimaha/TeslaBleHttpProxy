@@ -1,0 +1,311 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f3f3f3;
+    margin: 0;
+    padding: 0;
+    color: #333; /* Standardtextfarbe im Hell Mode */
+}
+
+.container {
+    max-width: 400px;
+    margin: 0 auto;
+    background-color: #fff;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+h1 {
+    font-size: 24px;
+}
+
+.settings-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 34px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #2196F3;
+}
+
+input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+}
+
+input:checked + .slider:before {
+    -webkit-transform: translateX(26px);
+    -ms-transform: translateX(26px);
+    transform: translateX(26px);
+}
+
+/* Allgemeine Stil-Anpassungen */
+.setting {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #ccc;
+    padding: 10px 0;
+    min-height: 35px;
+}
+
+.setting span {
+    font-size: 16px;
+    flex: 1;
+}
+
+/* Verbräuche in Watt */
+.consumption {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4caf50; /* Grün */
+    text-align: right;
+}
+
+/* Verbräuche in Watt */
+.value {
+    font-size: 16px;
+    font-weight: bold;
+    color: #343434; /* Grau */
+    text-align: right;
+}
+
+/* Dropdown-Menü */
+.dropdown {
+    border: none;
+    border-bottom: 1px solid #ccc;
+    font-size: 16px;
+    padding: 5px;
+    width: 150px;
+    background-color: #f3f3f3;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.dropdown option {
+    font-size: 16px;
+}
+
+/* Horizontales Dropdown-Menü */
+.dropdown-horizontal {
+    border: none;
+    border-bottom: 1px solid #ccc;
+    font-size: 16px;
+    padding: 5px;
+    background-color: #f3f3f3;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    display: inline-block;
+}
+
+.dropdown-horizontal option {
+    font-size: 16px;
+}
+
+/* Speichern-Button */
+.save-button {
+    background-color: #f00; /* Rotes Tesla-ähnliches Rot */
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.add-button {
+    background-color: #ffcc33;
+    color: #333;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+.add-button:hover {
+    background-color: #ff9900;
+}
+
+/* Fehlermeldung */
+.message.error {
+    background-color: #ff0000; /* Rotes Fehler-Design */
+    color: #fff;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+/* Erfolgsmeldung */
+.message.success {
+    background-color: #00cc00; /* Grünes Erfolg-Design */
+    color: #fff;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+/* Hinweismeldung */
+.message.info {
+    background-color: #3333cc; /* Blaues Hinweis-Design */
+    color: #fff;
+    padding: 10px;
+    margin: 10px 0;
+}
+
+.message h2 {
+    font-size: 18px;
+    margin-bottom: 5px;
+}
+
+.message p {
+    font-size: 16px;
+}
+
+/* Geplante Einstellungen */
+.planned-settings {
+    background-color: #f3f3f3;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.planned-settings h2 {
+    font-size: 20px;
+}
+
+.planned-settings-list {
+    list-style-type: none;
+    padding: 0;
+}
+
+.planned-setting {
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #ccc;
+    padding: 10px 0;
+}
+
+.setting-column {
+    flex: 1;
+}
+
+.setting-column-shrink {
+    flex: 0 0 auto;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.add-setting {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.add-setting input {
+    flex: 1;
+    border: none;
+    border-bottom: 1px solid #ccc;
+    font-size: 16px;
+    padding: 5px;
+}
+
+.delete-button {
+    background-color: #f00;
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.delete-button:hover {
+    background-color: #cc0000;
+}
+
+/* Stil für das Löschen-Icon */
+.delete-icon {
+    font-size: 20px;
+    margin-right: 5px;
+}
+
+/* Dark Mode Media Query */
+@media (prefers-color-scheme: dark) {
+    body {
+        background-color: #333; /* Hintergrundfarbe im Dark Mode */
+        color: #fff; /* Textfarbe im Dark Mode */
+    }
+
+    .container {
+        background-color: #000;
+    }
+
+    .setting {
+        border-bottom: 1px solid #ccc;
+    }
+
+    .planned-settings {
+        background-color: #222;
+        border: 1px solid #ccc;
+    }
+
+    .value {
+        color: #ddd;
+    }
+
+    .save-button {
+        background-color: #800;
+    }
+}
