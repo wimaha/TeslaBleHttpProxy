@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/wimaha/TeslaBleHttpProxy/html"
 
 	"github.com/gorilla/mux"
 	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
@@ -87,9 +88,10 @@ func main() {
 
 	// Define the endpoints
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
-	//router.NotFoundHandler = router.NewRoute().HandlerFunc(testR).GetHandler()
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
-	//router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("GET")
+	router.HandleFunc("/dashboard", html.ShowDashboard).Methods("GET")
+	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	log.Info("TeslaBleHttpProxy is running!")
 	log.Fatal(http.ListenAndServe(":8080", router))
@@ -221,7 +223,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log.Debug("Connecting to bluetooth adapter ...")
+	log.Debug("Connecting to vehicle (A)...")
 	conn, err := ble.NewConnection(ctx, vin)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
@@ -240,7 +242,7 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 		return true, fmt.Errorf("failed to connect to vehicle (B): %s", err)
 	}
 
-	log.Debug("Connecting to vehicle...")
+	log.Debug("Connecting to vehicle (B)...")
 	if err := car.Connect(ctx); err != nil {
 		return true, fmt.Errorf("failed to connect to vehicle (C): %s", err)
 	}
@@ -295,28 +297,38 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 			return true, fmt.Errorf("failed to stop charge: %s", err)
 		}
 	case "set_charging_amps":
-		if chargingAmpsString, ok := body["charging_amps"].(string); ok {
-			if chargingAmps, err := strconv.ParseInt(chargingAmpsString, 10, 32); err == nil {
-				if err := car.SetChargingAmps(ctx, int32(chargingAmps)); err != nil {
-					return true, fmt.Errorf("failed to set charging Amps to %d: %s", chargingAmps, err)
-				}
+		var chargingAmps int32
+		switch v := body["charging_amps"].(type) {
+		case float64:
+			chargingAmps = int32(v)
+		case string:
+			if chargingAmps64, err := strconv.ParseInt(v, 10, 32); err == nil {
+				chargingAmps = int32(chargingAmps64)
 			} else {
 				return false, fmt.Errorf("charing Amps parsing error: %s", err)
 			}
-		} else {
+		default:
 			return false, fmt.Errorf("charing Amps missing in body")
 		}
+		if err := car.SetChargingAmps(ctx, chargingAmps); err != nil {
+			return true, fmt.Errorf("failed to set charging Amps to %d: %s", chargingAmps, err)
+		}
 	case "set_charge_limit":
-		if chargeLimitString, ok := body["percent"].(string); ok {
-			if chargeLimit, err := strconv.ParseInt(chargeLimitString, 10, 32); err == nil {
-				if err := car.ChangeChargeLimit(ctx, int32(chargeLimit)); err != nil {
-					return true, fmt.Errorf("failed to set charge limit to %d %%: %s", chargeLimit, err)
-				}
+		var chargeLimit int32
+		switch v := body["percent"].(type) {
+		case float64:
+			chargeLimit = int32(v)
+		case string:
+			if chargeLimit64, err := strconv.ParseInt(v, 10, 32); err == nil {
+				chargeLimit = int32(chargeLimit64)
 			} else {
-				return false, fmt.Errorf("charge limit parsing error: %s", err)
+				return false, fmt.Errorf("charing Amps parsing error: %s", err)
 			}
-		} else {
-			return false, fmt.Errorf("charge limit missing in body")
+		default:
+			return false, fmt.Errorf("charing Amps missing in body")
+		}
+		if err := car.ChangeChargeLimit(ctx, chargeLimit); err != nil {
+			return true, fmt.Errorf("failed to set charge limit to %d %%: %s", chargeLimit, err)
 		}
 	case "session_info":
 		publicKey, err := protocol.LoadPublicKey("key/public.pem")

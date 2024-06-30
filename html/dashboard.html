@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="container">
+    <div class="header">
+        <h1>TeslaBleHttpProxy</h1>
+    </div>
+    <ul class="settings-list">
+        <li>
+            <div class="setting">
+                <span>Private Key</span>
+                <span class="value">{{.privateKey}}</span>
+            </div>
+        </li>
+        <li>
+            <div class="setting">
+                <span>Public Key</span>
+                <span class="value">{{.publicKey}}</span>
+            </div>
+        </li>
+    </ul>
+    {{ if eq .shouldGenKeys true }}
+    <div class="add-setting">
+        <form action="/gen_keys" method="GET"><button id="add-button" class="add-button">generate Keys</button></form>
+    </div>
+    {{ end }}
+</div>
+{{end}}
