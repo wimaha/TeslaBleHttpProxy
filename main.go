@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -73,6 +74,9 @@ func (s *Stack) Pop() (Command, bool) {
 	}
 }
 
+//go:embed static/*
+var static embed.FS
+
 func main() {
 	log.Info("TeslaBleHttpProxy is loading ...")
 
@@ -90,8 +94,7 @@ func main() {
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
 	router.HandleFunc("/dashboard", html.ShowDashboard).Methods("GET")
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static/")))
-	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
 
 	log.Info("TeslaBleHttpProxy is running!")
 	log.Fatal(http.ListenAndServe(":8080", router))
@@ -115,7 +118,7 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		ret.Response = response
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(ret)
 	}()
 
