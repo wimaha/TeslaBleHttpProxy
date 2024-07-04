@@ -1,25 +1,19 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/wimaha/TeslaBleHttpProxy/control"
 	"github.com/wimaha/TeslaBleHttpProxy/html"
 
 	"github.com/gorilla/mux"
-	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
-	"github.com/teslamotors/vehicle-command/pkg/protocol"
-	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
-	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
 type Ret struct {
@@ -39,40 +33,13 @@ type Command struct {
 	Body    map[string]interface{}
 }
 
-var privateKeyFile = "key/private.pem"
+//var privateKeyFile = "key/private.pem"
 
 var exceptedCommands = []string{"flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
 
-type Stack []Command
+//var currentCommands control.Stack
 
-var currentCommands Stack
-
-// IsEmpty: check if stack is empty
-func (s *Stack) IsEmpty() bool {
-	return len(*s) == 0
-}
-
-// Push a new value onto the stack
-func (s *Stack) Push(str Command) {
-	*s = append(*s, str) // Simply append the new value to the end of the stack
-}
-
-// Prepend to Stack
-func (s *Stack) Prepend(str Command) {
-	*s = append([]Command{str}, *s...)
-}
-
-// Remove and return top element of stack. Return true if stack is empty.
-func (s *Stack) Pop() (Command, bool) {
-	if s.IsEmpty() {
-		return Command{}, true
-	} else {
-		index := 0             // Get the index of the top most element.
-		element := (*s)[index] // Index into the slice and obtain the element.
-		*s = (*s)[index+1:]    // Remove it from the stack by slicing it off.
-		return element, false
-	}
-}
+var bleControl *control.BleControl
 
 //go:embed static/*
 var static embed.FS
@@ -86,9 +53,13 @@ func main() {
 		log.Debug("LogLevel set to debug")
 	}
 
-	router := mux.NewRouter()
+	var err error
+	if bleControl, err = control.NewBleControl(); err != nil {
+		log.Fatal("BleControl could not be initialized!")
+	}
+	go bleControl.Loop()
 
-	go loop()
+	router := mux.NewRouter()
 
 	// Define the endpoints
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
@@ -137,28 +108,13 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var newCommand Command
-	newCommand.Vin = vin
-	newCommand.Command = command
-	newCommand.Body = body
-
-	currentCommands.Push(newCommand)
+	bleControl.PushCommand(command, vin, body)
 
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
 
-func loop() {
-	for {
-		time.Sleep(1 * time.Second)
-		command, empty := currentCommands.Pop()
-		if !empty {
-			handleCommand(command)
-		}
-	}
-}
-
-func handleCommand(command Command) {
+/*func handleCommand(command Command) {
 	log.Info("handle command", "command", command.Command, "VIN", command.Vin)
 
 	var response Response
@@ -348,4 +304,4 @@ func executeCommand(body map[string]interface{}, command string, vin string, pri
 
 	// everything fine
 	return false, nil
-}
+}*/
