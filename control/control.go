@@ -97,7 +97,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command
 			//Failed but no retry possible
 			log.Error("can't connect to vehicle", "error", err)
 			return nil
-		} else if err != nil {
+		} else {
 			lastErr = err
 		}
 	}
@@ -221,15 +221,16 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Command) *Command {
 	if firstCommand.Command != "wake_up" {
-		err, cmd := bc.executeCommand(car, firstCommand)
+		cmd, err := bc.executeCommand(car, firstCommand)
 		if err != nil {
 			return cmd
 		}
 	}
 
+	timeout := time.After(29 * time.Second)
 	for {
 		select {
-		case <-time.After(30 * time.Second):
+		case <-timeout:
 			log.Debug("Connection Timeout")
 			return nil
 		case command, ok := <-bc.commandStack:
@@ -243,7 +244,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 				return &command
 			}
 
-			err, cmd := bc.executeCommand(car, &command)
+			cmd, err := bc.executeCommand(car, &command)
 			if err != nil {
 				return cmd
 			}
@@ -251,7 +252,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 	}
 }
 
-func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (error, *Command) {
+func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*Command, error) {
 	log.Debug("sending command ...", "command", command.Command)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -279,13 +280,13 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (er
 			//closed pipe
 			if strings.Contains(err.Error(), "closed pipe") {
 				//Verbindung ging verloren, Command zurückgeben, sodass er erneut ausgeführt wird
-				return err, command
+				return command, err
 			}
 			lastErr = err
 		}
 	}
 	log.Error("The command was canceled.", "command", command.Command, "err", lastErr)
-	return lastErr, nil
+	return nil, lastErr
 }
 
 func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, command *Command) (bool, error) {
