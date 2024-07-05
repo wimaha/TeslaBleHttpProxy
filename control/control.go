@@ -212,7 +212,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 }
 
 func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*Command, error) {
-	log.Info("sending...", "command", command.Command, "body", command.Body)
+	log.Info("sending", "command", command.Command, "body", command.Body)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

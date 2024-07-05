@@ -80,7 +80,9 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(ret)
+		if err := json.NewEncoder(w).Encode(ret); err != nil {
+			log.Fatal("failed to send response", "error", err)
+		}
 	}()
 
 	//Body
@@ -89,10 +91,10 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		log.Error("decoding body", "err", err)
 	}
 
-	log.Info("received command", "command", command, "VIN", vin, "body", body)
+	log.Info("received", "command", command, "body", body)
 
 	if !slices.Contains(exceptedCommands, command) {
-		log.Error("The command is not supported.", "command", command)
+		log.Error("not supported", "command", command)
 		response.Reason = fmt.Sprintf("The command \"%s\" is not supported.", command)
 		response.Result = false
 		return
