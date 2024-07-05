@@ -27,10 +27,10 @@ func NewBleControl() (*BleControl, error) {
 	var privateKey protocol.ECDHPrivateKey
 	var err error
 	if privateKey, err = protocol.LoadPrivateKey(privateKeyFile); err != nil {
-		log.Error("Failed to load private key.", "err", err)
+		log.Error("failed to load private key.", "err", err)
 		return nil, fmt.Errorf("failed to load private key: %s", err)
 	}
-	log.Debug("PrivateKeyFile loaded")
+	log.Debug("privateKeyFile loaded")
 
 	return &BleControl{
 		privateKey:   privateKey,
@@ -68,7 +68,7 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command) *Command {
-	log.Info("connectToVehicle ...")
+	log.Info("connecting to Vehicle ...")
 
 	var sleep = 3 * time.Second
 	var retryCount = 3
@@ -88,9 +88,9 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command
 		if err == nil {
 			//Successful
 			defer conn.Close()
-			defer log.Debug("Close connection (A)")
+			defer log.Debug("close connection (A)")
 			defer car.Disconnect()
-			defer log.Debug("Disconnect vehicle (A)")
+			defer log.Debug("disconnect vehicle (A)")
 			cmd := bc.operateConnection(car, firstCommand)
 			return cmd
 		} else if !retry {
@@ -106,7 +106,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command
 }
 
 func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
-	log.Debug("Connecting to vehicle (A)...")
+	log.Debug("connecting to vehicle (A)...")
 	var conn *ble.Connection
 	var car *vehicle.Vehicle
 	var shouldDefer = true
@@ -114,11 +114,11 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 	defer func() {
 		if shouldDefer {
 			if car != nil {
-				log.Debug("Disconnect vehicle (B)")
+				log.Debug("disconnect vehicle (B)")
 				car.Disconnect()
 			}
 			if conn != nil {
-				log.Debug("Close connection (B)")
+				log.Debug("close connection (B)")
 				conn.Close()
 			}
 		}
@@ -137,13 +137,13 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 	}
 	//defer conn.Close()
 
-	log.Debug("Create vehicle object ...")
+	log.Debug("create vehicle object ...")
 	car, err = vehicle.NewVehicle(conn, bc.privateKey, nil)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (B): %s", err)
 	}
 
-	log.Debug("Connecting to vehicle (B)...")
+	log.Debug("connecting to vehicle (B)...")
 	if err := car.Connect(ctx); err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (C): %s", err)
 	}
@@ -171,48 +171,7 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 	}); err != nil {
 		return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
 	}
-	log.Info("Session started")
-
-	/*
-		// Bei wake_up nur die Domain VCSEC ansprechen
-		var shouldExpandSession = false
-		var domains []universalmessage.Domain = nil
-		if firstCommand.Command == "wake_up" {
-			domains = []universalmessage.Domain{protocol.DomainVCSEC}
-			shouldExpandSession = true
-		}
-
-		if err := car.StartSession(ctx, domains); err != nil {
-			if strings.Contains(err.Error(), "context deadline exceeded") {
-				//try wakeup vehicle
-				log.Error("failed to perform handshake with vehicle", "error", err)
-				log.Info("try wakeup vehicle...")
-				if err := car.StartSession(ctx, []universalmessage.Domain{protocol.DomainVCSEC}); err != nil {
-					return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle: %s", err)
-				} else {
-					log.Debug("Wakeup Session")
-					if err := car.Wakeup(ctx); err != nil {
-						return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
-					} else {
-						log.Info("car successfully wakeup")
-						shouldExpandSession = true
-					}
-				}
-			} else {
-				return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
-			}
-		}
-
-		if firstCommand.Command == "wake_up" {
-			bc.executeCommand(car, firstCommand)
-		}
-
-		if shouldExpandSession {
-			log.Debug("expand session...")
-			if err := car.StartSession(ctx, nil); err != nil {
-				return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
-			}
-		}*/
+	log.Info("connection established")
 
 	// everything fine
 	shouldDefer = false
@@ -231,7 +190,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 	for {
 		select {
 		case <-timeout:
-			log.Debug("Connection Timeout")
+			log.Debug("connection Timeout")
 			return nil
 		case command, ok := <-bc.commandStack:
 			if !ok {
@@ -240,7 +199,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 
 			//If new VIN, close connection
 			if command.Vin != firstCommand.Vin {
-				log.Debug("New VIN, so close Connection")
+				log.Debug("new VIN, so close connection")
 				return &command
 			}
 
@@ -253,7 +212,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 }
 
 func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*Command, error) {
-	log.Debug("sending command ...", "command", command.Command)
+	log.Info("sending...", "command", command.Command, "body", command.Body)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -272,20 +231,20 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*C
 		retry, err := bc.sendCommand(ctx, car, command)
 		if err == nil {
 			//Successful
-			log.Info("The command was successfully executed.", "command", command.Command)
+			log.Info("successfully executed", "command", command.Command, "body", command.Body)
 			return nil, nil
 		} else if !retry {
 			return nil, nil
 		} else {
 			//closed pipe
 			if strings.Contains(err.Error(), "closed pipe") {
-				//Verbindung ging verloren, Command zurückgeben, sodass er erneut ausgeführt wird
+				//connection lost, returning the command so it can be executed again
 				return command, err
 			}
 			lastErr = err
 		}
 	}
-	log.Error("The command was canceled.", "command", command.Command, "err", lastErr)
+	log.Error("canceled", "command", command.Command, "body", command.Body, "err", lastErr)
 	return nil, lastErr
 }
 

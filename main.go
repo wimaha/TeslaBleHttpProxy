@@ -45,7 +45,7 @@ var bleControl *control.BleControl
 var static embed.FS
 
 func main() {
-	log.Info("TeslaBleHttpProxy is loading ...")
+	log.Info("TeslaBleHttpProxy 1.1 is loading ...")
 
 	envLogLevel := os.Getenv("logLevel")
 	if envLogLevel == "debug" {
