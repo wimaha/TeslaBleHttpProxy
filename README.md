@@ -68,6 +68,22 @@ tesla-control -vin YOUR_VIN -ble add-key-request public.pem owner cloud_key
 
 ## Setup EVCC
 
+***Since version 0.128.0 or newer of evcc it is very easy to integrate ble proxy:***
+```
+- name: model3
+    type: template
+    template: tesla
+    title: Tesla
+    icon: car
+    accessToken: YOUR_ACCESS_TOKEN
+    refreshToken: YOUR_REFRSH_TOKEN
+    capacity: 60
+    commandProxy: http://YOUR_IP:8080
+```
+
+If you want to use an older version:
+
+
 ***Attention: You have to use at least version 0.127.2 or newer of evcc***
 Below is a sample configuration of a custom vehicle in evcc:
 
