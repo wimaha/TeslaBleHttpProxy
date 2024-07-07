@@ -23,5 +23,6 @@ go.work.sum
 
 key/private.pem
 key/public.pem
+key/*
 
 .DS_Store
