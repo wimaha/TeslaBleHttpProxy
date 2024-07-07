@@ -1,4 +1,12 @@
 {{define "content"}}
+{{range $i, $a := .Messages}}
+<div class="container">
+    <div class='{{if eq $a.Type.String "Error"}}message error{{else if eq $a.Type.String "Success"}}message success{{else if eq $a.Type.String "Info"}}message info{{end}}'>
+        <h2>{{ $a.Title }}</h2>
+        <p>{{ $a.Message }}</p>
+    </div>
+</div>
+{{ end }}
 <div class="container">
     <div class="header">
         <h1>TeslaBleHttpProxy</h1>
@@ -7,20 +15,53 @@
         <li>
             <div class="setting">
                 <span>Private Key</span>
-                <span class="value">{{.privateKey}}</span>
+                <span class="value">{{.PrivateKey}}</span>
             </div>
         </li>
         <li>
             <div class="setting">
                 <span>Public Key</span>
-                <span class="value">{{.publicKey}}</span>
+                <span class="value">{{.PublicKey}}</span>
             </div>
         </li>
     </ul>
-    {{ if eq .shouldGenKeys true }}
+    {{ if eq .ShouldGenKeys true }}
     <div class="add-setting">
         <form action="/gen_keys" method="GET"><button id="add-button" class="add-button">generate Keys</button></form>
     </div>
+    {{ else }}
+    <div class="add-setting">
+        <span><br>Important: Only use this function, if you know what you are doing. This can't be undone!</span>
+    </div>
+    <div class="add-setting">
+        <form id="remove-keys-form" action="/remove_keys" method="GET">
+            <button id="add-button" class="save-button" type="button">remove Keys</button>
+        </form>
+    </div>
+    <script>
+        document.getElementById('add-button').addEventListener('click', function(event) {
+            const userConfirmed = confirm('Are you sure you want to remove the keys?');
+            if (userConfirmed) {
+                document.getElementById('remove-keys-form').submit();
+            }
+        });
+    </script>
     {{ end }}
+</div>
+<div class="container">
+    <div class="header">
+        <h2>Setup Vehicle</h2>
+    </div>
+    <form id="send-key-form" action="/send_key" method="POST">
+        <ul class="settings-list">
+            <li>
+                <div class="setting">
+                    <span>VIN</span>
+                    <input class="dropdown-horizontal" type="input" name="VIN" />
+                </div>
+            </li>
+        </ul>
+        <button id="save-button" class="add-button" type="submit">Send Key to Vehicle</button>
+    </form>
 </div>
 {{end}}

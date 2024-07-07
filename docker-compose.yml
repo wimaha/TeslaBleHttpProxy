@@ -1,7 +1,7 @@
 version: '3.1'
 services:
   tesla-ble-http-proxy:
-    image: wimaha/tesla-ble-http-proxy
+    image: wimaha/tesla-ble-http-proxy:dev
     container_name: tesla-ble-http-proxy
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
@@ -12,5 +12,5 @@ services:
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
-   # environment:
-   #   logLevel: debug
+    environment:
+      logLevel: debug
