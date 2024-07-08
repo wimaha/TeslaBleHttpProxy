@@ -15,7 +15,7 @@ The program stores the received requests in a queue and processes them one by on
 
 ## How to install
 
-You can either compile and use the Go program yourself or install it in a Docker container. ([detailed instruction](https://github.com/wimaha/TeslaBleHttpProxy/blob/main/docs/installation.md))
+You can either compile and use the Go program yourself or install it in a Docker container. ([detailed instruction](docs/installation.md))
 
 ### Docker compose
 
@@ -51,6 +51,8 @@ go build .
 Please remember to create an empty folder called `key` where the keys can be stored later.
 
 ## Generate key for vehicle
+
+*(Here, the simple, automatic method is described. Besides the automatic method, you can also generate the keys [manually](docs/manually_gen_key.md).)*
 
 To generate the required keys browse to `http://YOUR_IP:8080/dashboard`. In the dashboard you will see that the keys are missing:
 
