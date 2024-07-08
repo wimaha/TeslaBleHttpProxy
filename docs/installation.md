@@ -127,6 +127,6 @@ After that please enter your VIN under `Setup Vehicle`. Before you proceed make 
 
 Finally the keys is send to the vehicle. You have to confirm by tapping your NFC card on center console.
 
-<img src="proxy4.png" alt="Picture of success message sent add-key request." width="40%" height="40%">
+<img src="proxy6.png" alt="Picture of success message sent add-key request." width="40%" height="40%">
 
 You can now close the dashboard and use the proxy. 🙂
