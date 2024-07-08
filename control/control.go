@@ -167,6 +167,7 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 	}
 	//defer car.Disconnect()
 
+	//Start Session only if privateKey is available
 	if bc.privateKey != nil {
 		log.Debug("start VCSEC session...")
 		// First connect just VCSEC so we can Wakeup() the car if needed.
