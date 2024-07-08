@@ -33,7 +33,7 @@ var exceptedCommands = []string{"flash_lights", "wake_up", "set_charging_amps", 
 var static embed.FS
 
 func main() {
-	log.Info("TeslaBleHttpProxy 1.1 is loading ...")
+	log.Info("TeslaBleHttpProxy 1.2 is loading ...")
 
 	envLogLevel := os.Getenv("logLevel")
 	if envLogLevel == "debug" {
