@@ -37,7 +37,7 @@ services:
       - SYS_ADMIN
 ```
 
-Please ensure that you specify the folder containing the `private.pem` correctly. In this example, it is `~/TeslaBleHttpProxy/key`.
+Please remember to create an empty folder where the keys can be stored later. In this example, it is `~/TeslaBleHttpProxy/key`.
 
 ### Build yourself
 
@@ -48,23 +48,27 @@ go build .
 ./TeslaBleHttpProxy
 ```
 
-Be sure to add the `private.pem` in a folder called `key`.
+Please remember to create an empty folder called `key` where the keys can be stored later.
 
 ## Generate key for vehicle
 
-You can generate the required keys using the following steps. For more information, see also the documentation of the [Tesla Vehicle Command SDK](https://github.com/teslamotors/vehicle-command/blob/main/cmd/tesla-control/README.md).
+To generate the required keys browse to `http://YOUR_IP:8080/dashboard`. In the dashboard you will see that the keys are missing:
 
-```
-git clone https://github.com/teslamotors/vehicle-command.git
-cd vehicle-command
-go get ./...
-go build ./...
-go install ./...
-openssl ecparam -genkey -name prime256v1 -noout > private.pem
-openssl ec -in private.pem -pubout > public.pem
-sudo setcap 'cap_net_admin=eip' "$(which tesla-control)"
-tesla-control -vin YOUR_VIN -ble add-key-request public.pem owner cloud_key
-```
+<img src="docs/proxy1.png" alt="Picture of the Dashboard with missing keys." width="40%" height="40%">
+
+Please click on `generate Keys` and the keys will be automatically generated and saved.
+
+<img src="docs/proxy2.png" alt="Picture of the Dashboard with success message and keys." width="40%" height="40%">
+
+After that please enter your VIN under `Setup Vehicle`. Before you proceed make sure your vehicle is awake! So you have to manually wake the vehicle before you send the key to the vehicle.
+
+<img src="docs/proxy3.png" alt="Picture of Setup Vehicle Part of the Dashboard." width="40%" height="40%">
+
+Finally the keys is send to the vehicle. You have to confirm by tapping your NFC card on center console.
+
+<img src="docs/proxy6.png" alt="Picture of success message sent add-key request." width="40%" height="40%">
+
+You can now close the dashboard and use the proxy. 🙂
 
 ## Setup EVCC
 

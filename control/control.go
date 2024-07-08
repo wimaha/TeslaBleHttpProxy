@@ -12,10 +12,28 @@ import (
 	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
+	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
-var privateKeyFile = "key/private.pem"
+var PublicKeyFile = "key/public.pem"
+var PrivateKeyFile = "key/private.pem"
+
+var BleControlInstance *BleControl = nil
+
+func SetupBleControl() {
+	var err error
+	if BleControlInstance, err = NewBleControl(); err != nil {
+		log.Warn("BleControl could not be initialized!")
+	} else {
+		go BleControlInstance.Loop()
+		log.Info("BleControl initialized")
+	}
+}
+
+func CloseBleControl() {
+	BleControlInstance = nil
+}
 
 type BleControl struct {
 	privateKey protocol.ECDHPrivateKey
@@ -26,7 +44,7 @@ type BleControl struct {
 func NewBleControl() (*BleControl, error) {
 	var privateKey protocol.ECDHPrivateKey
 	var err error
-	if privateKey, err = protocol.LoadPrivateKey(privateKeyFile); err != nil {
+	if privateKey, err = protocol.LoadPrivateKey(PrivateKeyFile); err != nil {
 		log.Error("failed to load private key.", "err", err)
 		return nil, fmt.Errorf("failed to load private key: %s", err)
 	}
@@ -149,29 +167,34 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 	}
 	//defer car.Disconnect()
 
-	log.Debug("start VCSEC session...")
-	// First connect just VCSEC so we can Wakeup() the car if needed.
-	if err := car.StartSession(ctx, []universalmessage.Domain{
-		protocol.DomainVCSEC,
-	}); err != nil {
-		return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
-	}
+	//Start Session only if privateKey is available
+	if bc.privateKey != nil {
+		log.Debug("start VCSEC session...")
+		// First connect just VCSEC so we can Wakeup() the car if needed.
+		if err := car.StartSession(ctx, []universalmessage.Domain{
+			protocol.DomainVCSEC,
+		}); err != nil {
+			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
+		}
 
-	if err := car.Wakeup(ctx); err != nil {
-		return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+		if err := car.Wakeup(ctx); err != nil {
+			return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+		} else {
+			log.Debug("car successfully wakeup")
+		}
+
+		log.Debug("start Infotainment session...")
+		// Then we can also connect the infotainment
+		if err := car.StartSession(ctx, []universalmessage.Domain{
+			protocol.DomainVCSEC,
+			protocol.DomainInfotainment,
+		}); err != nil {
+			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+		}
+		log.Info("connection established")
 	} else {
-		log.Debug("car successfully wakeup")
+		log.Info("Key-Request connection established")
 	}
-
-	log.Debug("start Infotainment session...")
-	// Then we can also connect the infotainment
-	if err := car.StartSession(ctx, []universalmessage.Domain{
-		protocol.DomainVCSEC,
-		protocol.DomainInfotainment,
-	}); err != nil {
-		return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
-	}
-	log.Info("connection established")
 
 	// everything fine
 	shouldDefer = false
@@ -311,7 +334,7 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 			return true, fmt.Errorf("failed to set charge limit to %d %%: %s", chargeLimit, err)
 		}
 	case "session_info":
-		publicKey, err := protocol.LoadPublicKey("key/public.pem")
+		publicKey, err := protocol.LoadPublicKey(PublicKeyFile)
 		if err != nil {
 			return false, fmt.Errorf("failed to load public key: %s", err)
 		}
@@ -321,6 +344,17 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 			return true, fmt.Errorf("failed session_info: %s", err)
 		}
 		fmt.Printf("%s\n", info)
+	case "add-key-request":
+		publicKey, err := protocol.LoadPublicKey(PublicKeyFile)
+		if err != nil {
+			return false, fmt.Errorf("failed to load public key: %s", err)
+		}
+
+		if err := car.SendAddKeyRequest(ctx, publicKey, true, vcsec.KeyFormFactor_KEY_FORM_FACTOR_CLOUD_KEY); err != nil {
+			return true, fmt.Errorf("failed to add key: %s", err)
+		} else {
+			log.Info(fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", car.VIN()))
+		}
 	}
 
 	// everything fine

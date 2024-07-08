@@ -16,45 +16,7 @@ Update everything once after installation:
 sudo apt-get update && sudo apt-get upgrade
 ```
 
-## Step 2: Generate key for vehicle
-
-You can generate the required keys and send them to your tesla using the following steps. Be sure you are in the home directory `~`.
-
-Download and install Go:
-```
-sudo apt update && sudo apt install -y wget git build-essential
-wget https://dl.google.com/go/go1.22.1.linux-arm64.tar.gz
-tar -xvf go1.22.1.linux-arm64.tar.gz
-mkdir -p ~/.local/share && mv go ~/.local/share
-export GOPATH=$HOME/.local/share/go
-export PATH=$HOME/.local/share/go/bin:$PATH
-echo 'export GOPATH=$HOME/.local/share/go' >> ~/.bashrc
-echo 'export PATH=$HOME/.local/share/go/bin:$PATH' >> ~/.bashrc
-```
-
-Download and install tesla vehicle-command:
-```
-git clone https://github.com/teslamotors/vehicle-command.git
-cd vehicle-command
-go get ./...
-go build ./...
-go install ./...
-sudo setcap 'cap_net_admin=eip' "$(which tesla-control)"
-```
-
-Generate a private and a public key
-```
-openssl ecparam -genkey -name prime256v1 -noout > private.pem
-openssl ec -in private.pem -pubout > public.pem
-```
-
-Send the puclic key via BLE to your tesla. Be sure to replace YOUR_VIN with your VIN.
-```
-tesla-control -vin YOUR_VIN -ble add-key-request public.pem owner cloud_key
-```
-After you have successfully triggered the last command, you must tap the key card in the center console (no message is displayed on the Tesla before tapping the card) and confirm the addition of the key.
-
-## Step 3: Install TeslaBleHttpProxy
+## Step 2: Install TeslaBleHttpProxy
 
 There are two alternative ways to install TeslaBleHttpProxy. You can either run the program in Docker or compile it with Go and run it directly.
 
@@ -92,6 +54,7 @@ Make sure you are in the home directory `~` again. Create a Folder for your Dock
 ```
 mkdir TeslaBleHttpProxy
 cd TeslaBleHttpProxy
+mkdir key
 ```
 
 Create the docker compose file and open it:
@@ -147,3 +110,23 @@ docker logs --since 12h tesla-ble-http-proxy
 ### Step B-1: Download and Build
 
 This variant will be described later.
+
+## Step 3: Generate key for vehicle
+
+To generate the required keys browse to `http://YOUR_IP:8080/dashboard`. In the dashboard you will see that the keys are missing:
+
+<img src="proxy1.png" alt="Picture of the Dashboard with missing keys." width="40%" height="40%">
+
+Please click on `generate Keys` and the keys will be automatically generated and saved.
+
+<img src="proxy2.png" alt="Picture of the Dashboard with success message and keys." width="40%" height="40%">
+
+After that please enter your VIN under `Setup Vehicle`. Before you proceed make sure your vehicle is awake! So you have to manually wake the vehicle before you send the key to the vehicle.
+
+<img src="proxy3.png" alt="Picture of Setup Vehicle Part of the Dashboard." width="40%" height="40%">
+
+Finally the keys is send to the vehicle. You have to confirm by tapping your NFC card on center console.
+
+<img src="proxy6.png" alt="Picture of success message sent add-key request." width="40%" height="40%">
+
+You can now close the dashboard and use the proxy. 🙂

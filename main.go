@@ -29,8 +29,6 @@ type Response struct {
 
 var exceptedCommands = []string{"flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
 
-var bleControl *control.BleControl
-
 //go:embed static/*
 var static embed.FS
 
@@ -43,11 +41,7 @@ func main() {
 		log.Debug("LogLevel set to debug")
 	}
 
-	var err error
-	if bleControl, err = control.NewBleControl(); err != nil {
-		log.Fatal("BleControl could not be initialized!")
-	}
-	go bleControl.Loop()
+	control.SetupBleControl()
 
 	router := mux.NewRouter()
 
@@ -55,6 +49,9 @@ func main() {
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
 	router.HandleFunc("/dashboard", html.ShowDashboard).Methods("GET")
+	router.HandleFunc("/gen_keys", html.GenKeys).Methods("GET")
+	router.HandleFunc("/remove_keys", html.RemoveKeys).Methods("GET")
+	router.HandleFunc("/send_key", html.SendKey).Methods("POST")
 	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
 
 	log.Info("TeslaBleHttpProxy is running!")
@@ -79,11 +76,21 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		ret.Response = response
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		if response.Result {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
 		if err := json.NewEncoder(w).Encode(ret); err != nil {
 			log.Fatal("failed to send response", "error", err)
 		}
 	}()
+
+	if control.BleControlInstance == nil {
+		response.Reason = "BleControl is not initialized. Maybe private.pem is missing."
+		response.Result = false
+		return
+	}
 
 	//Body
 	var body map[string]interface{} = nil
@@ -100,8 +107,18 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bleControl.PushCommand(command, vin, body)
+	control.BleControlInstance.PushCommand(command, vin, body)
 
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
+
+/*func pushCommand(command string, vin string, body map[string]interface{}) error {
+	if bleControl == nil {
+		return fmt.Errorf("BleControl is not initialized. Maybe private.pem is missing.")
+	}
+
+	bleControl.PushCommand(command, vin, body)
+
+	return nil
+}*/
