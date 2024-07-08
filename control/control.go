@@ -181,17 +181,19 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 		} else {
 			log.Debug("car successfully wakeup")
 		}
-	}
 
-	log.Debug("start Infotainment session...")
-	// Then we can also connect the infotainment
-	if err := car.StartSession(ctx, []universalmessage.Domain{
-		protocol.DomainVCSEC,
-		protocol.DomainInfotainment,
-	}); err != nil {
-		return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+		log.Debug("start Infotainment session...")
+		// Then we can also connect the infotainment
+		if err := car.StartSession(ctx, []universalmessage.Domain{
+			protocol.DomainVCSEC,
+			protocol.DomainInfotainment,
+		}); err != nil {
+			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+		}
+		log.Info("connection established")
+	} else {
+		log.Info("Key-Request connection established")
 	}
-	log.Info("connection established")
 
 	// everything fine
 	shouldDefer = false
