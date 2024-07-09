@@ -39,7 +39,7 @@ services:
 
 Please remember to create an empty folder where the keys can be stored later. In this example, it is `~/TeslaBleHttpProxy/key`.
 
-Pull and start TeslaBleHttpProxy with `docker compose up -d`
+Pull and start TeslaBleHttpProxy with `docker compose up -d`.
 
 ### Build yourself
 
