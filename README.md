@@ -39,6 +39,8 @@ services:
 
 Please remember to create an empty folder where the keys can be stored later. In this example, it is `~/TeslaBleHttpProxy/key`.
 
+Pull and start TeslaBleHttpProxy with `docker compose up -d`.
+
 ### Build yourself
 
 Download the code and save it in a folder named 'TeslaBleHttpProxy'. From there, you can easily compile the program.
