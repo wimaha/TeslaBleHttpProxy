@@ -66,13 +66,12 @@ nano docker-compose.yml
 Paste the following content to the file:
 
 ```
-version: '3.1'
 services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy
     container_name: tesla-ble-http-proxy
     volumes:
-      - ~/vehicle-command:/key
+      - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus
     restart: always
     privileged: true
