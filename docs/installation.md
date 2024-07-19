@@ -103,13 +103,16 @@ You can update the container as follows:
 
 ```
 docker-compose pull
-docker-compose up -d
+docker-compose down && docker-compose up -d
 ```
 
 You can show the logs like:
 
 ```
+docker-compose logs -f
+or
 docker logs --since 12h tesla-ble-http-proxy
+
 ```
 
 ### Step B-1: Download and Build
