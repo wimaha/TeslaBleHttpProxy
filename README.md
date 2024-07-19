@@ -22,6 +22,7 @@ You can either compile and use the Go program yourself or install it in a Docker
 Below you will find the necessary contents for your `docker-compose.yml`:
 
 ```
+version: '3.1'
 services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy
