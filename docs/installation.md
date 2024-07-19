@@ -39,6 +39,12 @@ Install Docker:
 curl -sSL https://get.docker.com | sh
 ```
 
+Install docker-compose
+
+```
+sudo apt -y install docker-compose
+```
+
 Setup the Docker user:
 
 ```
@@ -47,17 +53,16 @@ sudo usermod -aG docker $USER
 
 Now you have to log out and log back in for it to take effect.
 
-### Step A-2: Setup docker compose
+### Step A-2: Setup docker-compose
 
 Make sure you are in the home directory `~` again. Create a Folder for your Docker-Files for example `TeslaBleHttpProxy` and enter the new folder:
 
 ```
-mkdir TeslaBleHttpProxy
+mkdir TeslaBleHttpProxy/key -p
 cd TeslaBleHttpProxy
-mkdir key
 ```
 
-Create the docker compose file and open it:
+Create the docker-compose file and open it:
 
 ```
 nano docker-compose.yml
@@ -89,7 +94,7 @@ Exit the file with control + x and type `y` to save the file.
 Start the container with the following command:
 
 ```
-docker compose up -d
+docker-compose up -d
 ```
 
 ### Step A-4: Update and Show logs
@@ -97,8 +102,8 @@ docker compose up -d
 You can update the container as follows:
 
 ```
-docker pull wimaha/tesla-ble-http-proxy
-docker compose up -d
+docker-compose pull
+docker-compose up -d
 ```
 
 You can show the logs like:
