@@ -66,6 +66,7 @@ nano docker-compose.yml
 Paste the following content to the file:
 
 ```
+version: '3.1'
 services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy
