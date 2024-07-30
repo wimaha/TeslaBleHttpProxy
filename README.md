@@ -86,6 +86,7 @@ You can now close the dashboard and use the proxy. 🙂
     accessToken: YOUR_ACCESS_TOKEN
     refreshToken: YOUR_REFRSH_TOKEN
     capacity: 60
+    vin: YOUR_VIN
     commandProxy: http://YOUR_IP:8080
 ```
 
