@@ -273,6 +273,14 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*C
 
 func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, command *Command) (bool, error) {
 	switch command.Command {
+	case "charge_port_door_open":
+		if err := car.ChargePortOpen(ctx); err != nil {
+			return true, fmt.Errorf("failed to open charge port: %s", err)
+		}
+	case "charge_port_door_close":
+		if err := car.ChargePortClose(ctx); err != nil {
+			return true, fmt.Errorf("failed to close charge port: %s", err)
+		}
 	case "flash_lights":
 		if err := car.FlashLights(ctx); err != nil {
 			return true, fmt.Errorf("failed to flash lights: %s", err)
