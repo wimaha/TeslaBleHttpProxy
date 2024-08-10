@@ -1,7 +1,8 @@
 ############################
 # STEP 1 build executable binary
 ############################
-FROM golang:alpine AS builder
+#FROM golang:alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:alpine AS builder
 # Install git.
 # Git is required for fetching the dependencies.
 RUN apk update && apk add --no-cache git tzdata
@@ -12,7 +13,11 @@ COPY . .
 RUN go get -d -v
 # Build the binary.
 #RUN go build -o /go/bin/teslaBleHttpProxy
-RUN GOOS=linux go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
+#RUN GOOS=linux go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
 #RUN sudo setcap 'cap_net_admin=eip' "/go/bin/teslaBleHttpProxy"
 RUN mkdir -p /go/bin/key
 ############################
