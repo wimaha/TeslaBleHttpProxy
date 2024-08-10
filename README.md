@@ -138,6 +138,8 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - charge_stop
 - set_charging_amps
 - set_charge_limit
+- charge_port_door_open
+- charge_port_door_close
 - flash_lights
 
 
