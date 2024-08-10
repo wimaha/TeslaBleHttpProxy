@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
 	"github.com/wimaha/TeslaBleHttpProxy/control"
 	"github.com/wimaha/TeslaBleHttpProxy/html"
 
@@ -39,6 +40,7 @@ func main() {
 	if envLogLevel == "debug" {
 		log.SetLevel(log.DebugLevel)
 		log.Debug("LogLevel set to debug")
+		ble.SetDebugLog()
 	}
 
 	control.SetupBleControl()
