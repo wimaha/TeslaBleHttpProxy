@@ -1,6 +1,6 @@
 # Installation
 
-## Step 1: Install Raspberian
+## Step 1: Install Raspberry Pi OS
 
 Setup your raspberry Pi. You will find an installer here: https://www.raspberrypi.com/software/
 
