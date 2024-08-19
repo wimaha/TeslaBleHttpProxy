@@ -15,6 +15,22 @@ RUN go get -d -v
 #RUN go build -o /go/bin/teslaBleHttpProxy
 ARG TARGETOS
 ARG TARGETARCH
+ARG TARGETVARIANT
+ARG TARGETPLATFORM
+
+RUN printf '..%s..' "I'm building for TARGETPLATFORM=${TARGETPLATFORM}" \
+    && printf '..%s..' ", TARGETARCH=${TARGETARCH}" \
+    && printf '..%s..' ", TARGETVARIANT=${TARGETVARIANT} \n" \
+    && printf '..%s..' "With uname -s : " && uname -s \
+    && printf '..%s..' "and  uname -m : " && uname -m
+
+RUN case "${TARGETVARIANT}" in \
+	"armhf") export GOARM='6' ;; \
+	"armv7") export GOARM='6' ;; \
+	"v6") export GOARM='6' ;; \
+	"v7") export GOARM='7' ;; \
+	esac;
+
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
 #RUN GOOS=linux go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy

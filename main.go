@@ -34,7 +34,7 @@ var exceptedCommands = []string{"charge_port_door_open", "charge_port_door_close
 var static embed.FS
 
 func main() {
-	log.Info("TeslaBleHttpProxy 1.2.2 is loading ...")
+	log.Info("TeslaBleHttpProxy 1.2.3 is loading ...")
 
 	envLogLevel := os.Getenv("logLevel")
 	if envLogLevel == "debug" {
