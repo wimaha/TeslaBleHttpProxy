@@ -83,12 +83,14 @@ You can now close the dashboard and use the proxy. 🙂
     template: tesla
     title: Tesla
     icon: car
+    commandProxy: http://YOUR_IP:8080
     accessToken: YOUR_ACCESS_TOKEN
     refreshToken: YOUR_REFRSH_TOKEN
     capacity: 60
     vin: YOUR_VIN
-    commandProxy: http://YOUR_IP:8080
 ```
+
+(Hint for multiple vehicle support: https://github.com/wimaha/TeslaBleHttpProxy/issues/40)
 
 If you want to use an older version:
 
