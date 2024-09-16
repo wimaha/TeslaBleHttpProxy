@@ -23,8 +23,8 @@ FROM scratch
 # Timezone data
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 ENV TZ=Europe/Berlin
-WORKDIR /app/
-COPY --from=builder /go/bin//teslaBleHttpProxy /teslaBleHttpProxy
+#WORKDIR /app/
+COPY --from=builder /go/bin/teslaBleHttpProxy /teslaBleHttpProxy
 COPY --from=builder /go/bin/key /key
 EXPOSE 8080
 ENTRYPOINT ["/teslaBleHttpProxy"]

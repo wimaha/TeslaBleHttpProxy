@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := default
 
 IMAGE ?= wimaha/tesla-ble-http-proxy
-VERSION := 1.2.4
+VERSION := 1.2.5
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
