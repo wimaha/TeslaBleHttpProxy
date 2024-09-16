@@ -1,51 +1,30 @@
-############################
-# STEP 1 build executable binary
-############################
-#FROM golang:alpine AS builder
-FROM --platform=$BUILDPLATFORM golang:alpine AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.23.1 AS builder
+
 # Install git.
 # Git is required for fetching the dependencies.
-RUN apk update && apk add --no-cache git tzdata
+#RUN apk update && apk add --no-cache git tzdata
 WORKDIR $GOPATH/src/wimaha/teslaBleHttpProxy/
 COPY . .
 # Fetch dependencies.
 # Using go get.
-RUN go get -d -v
-# Build the binary.
-#RUN go build -o /go/bin/teslaBleHttpProxy
+#RUN go get -d -v
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
-ARG TARGETVARIANT
-ARG TARGETPLATFORM
 
-RUN printf '..%s..' "I'm building for TARGETPLATFORM=${TARGETPLATFORM}" \
-    && printf '..%s..' ", TARGETARCH=${TARGETARCH}" \
-    && printf '..%s..' ", TARGETVARIANT=${TARGETVARIANT} \n" \
-    && printf '..%s..' "With uname -s : " && uname -s \
-    && printf '..%s..' "and  uname -m : " && uname -m
-
-RUN case "${TARGETVARIANT}" in \
-	"armhf") export GOARM='6' ;; \
-	"armv7") export GOARM='6' ;; \
-	"v6") export GOARM='6' ;; \
-	"v7") export GOARM='7' ;; \
-	esac;
-
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
-    go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
-#RUN GOOS=linux go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy
-#RUN sudo setcap 'cap_net_admin=eip' "/go/bin/teslaBleHttpProxy"
+#WORKDIR /app/
+#ADD . .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy main.go
 RUN mkdir -p /go/bin/key
-############################
-# STEP 2 build a small image
-############################
+
 FROM scratch
 # Timezone data
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 ENV TZ=Europe/Berlin
-# Copy our static executable.
-COPY --from=builder /go/bin/teslaBleHttpProxy /teslaBleHttpProxy
+WORKDIR /app/
+COPY --from=builder /go/bin//teslaBleHttpProxy /teslaBleHttpProxy
 COPY --from=builder /go/bin/key /key
 EXPOSE 8080
-# Run the teslaBleHttpProxy binary.
 ENTRYPOINT ["/teslaBleHttpProxy"]
