@@ -43,6 +43,12 @@ func main() {
 		ble.SetDebugLog()
 	}
 
+	addr := os.Getenv("httpListenAddress")
+	if addr == "" {
+		addr = ":8080"
+	}
+	log.Info("TeslaBleHttpProxy", "httpListenAddress", addr)
+
 	control.SetupBleControl()
 
 	router := mux.NewRouter()
@@ -57,7 +63,7 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
 
 	log.Info("TeslaBleHttpProxy is running!")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	log.Fatal(http.ListenAndServe(addr, router))
 }
 
 /*func testR(w http.ResponseWriter, r *http.Request) {
