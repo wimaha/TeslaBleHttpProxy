@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := default
 
 IMAGE ?= wimaha/tesla-ble-http-proxy
-VERSION := 1.2.5
+VERSION := 1.2.6
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
@@ -24,7 +24,7 @@ publish:
 		--tag $(IMAGE):dev \
 		.
 
-.PHONY: publish # Push the image to the remote registry
+.PHONY: dev # Push the image to the remote registry
 dev:
 	@docker buildx create --use --name=crossplat --node=crossplat && \
 	docker buildx build \
