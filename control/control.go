@@ -273,6 +273,14 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*C
 
 func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, command *Command) (bool, error) {
 	switch command.Command {
+	case "auto_conditioning_start":
+		if err := car.ClimateOn(ctx); err != nil {
+			return true, fmt.Errorf("failed to start auto conditioning: %s", err)
+		}
+	case "auto_conditioning_stop":
+		if err := car.ClimateOff(ctx); err != nil {
+			return true, fmt.Errorf("failed to stop auto conditioning: %s", err)
+		}
 	case "charge_port_door_open":
 		if err := car.ChargePortOpen(ctx); err != nil {
 			return true, fmt.Errorf("failed to open charge port: %s", err)

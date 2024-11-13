@@ -5,7 +5,7 @@ go 1.23.1
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/gorilla/mux v1.8.1
-	github.com/teslamotors/vehicle-command v0.0.2
+	github.com/teslamotors/vehicle-command v0.2.1
 )
 
 require (
