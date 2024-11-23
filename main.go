@@ -34,7 +34,7 @@ var exceptedCommands = []string{"auto_conditioning_start", "auto_conditioning_st
 var static embed.FS
 
 func main() {
-	log.Info("TeslaBleHttpProxy 1.2.6 is loading ...")
+	log.Info("TeslaBleHttpProxy 1.2.7 is loading ...")
 
 	envLogLevel := os.Getenv("logLevel")
 	if envLogLevel == "debug" {
