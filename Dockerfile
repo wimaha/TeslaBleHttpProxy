@@ -1,4 +1,4 @@
-FROM --platform=${BUILDPLATFORM} golang:1.23.1 AS builder
+FROM --platform=${BUILDPLATFORM} golang:1.23.3 AS builder
 
 # Install git.
 # Git is required for fetching the dependencies.
