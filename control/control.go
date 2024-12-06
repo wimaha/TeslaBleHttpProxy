@@ -303,6 +303,10 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 				//The car is already charging, so the command is somehow successfully executed.
 				log.Info("the car is already charging")
 				return false, nil
+			} else if strings.Contains(err.Error(), "complete") {
+				//The charging is completed, so the command is somehow successfully executed.
+				log.Info("the charging is completed")
+				return false, nil
 			}
 			return true, fmt.Errorf("failed to start charge: %s", err)
 		}
