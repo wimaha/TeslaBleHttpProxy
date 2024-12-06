@@ -14,6 +14,7 @@ import (
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var PublicKeyFile = "key/public.pem"
@@ -38,7 +39,8 @@ func CloseBleControl() {
 type BleControl struct {
 	privateKey protocol.ECDHPrivateKey
 
-	commandStack chan Command
+	commandStack  chan Command
+	providerStack chan Command
 }
 
 func NewBleControl() (*BleControl, error) {
@@ -51,8 +53,9 @@ func NewBleControl() (*BleControl, error) {
 	log.Debug("privateKeyFile loaded")
 
 	return &BleControl{
-		privateKey:   privateKey,
-		commandStack: make(chan Command, 50),
+		privateKey:    privateKey,
+		commandStack:  make(chan Command, 50),
+		providerStack: make(chan Command),
 	}, nil
 }
 
@@ -64,25 +67,27 @@ func (bc *BleControl) Loop() {
 			retryCommand = bc.connectToVehicleAndOperateConnection(retryCommand)
 		} else {
 			// Wait for the next command
-			command, ok := <-bc.commandStack
-			if ok {
-				retryCommand = bc.connectToVehicleAndOperateConnection(&command)
+			select {
+			case command, ok := <-bc.providerStack:
+				if ok {
+					retryCommand = bc.connectToVehicleAndOperateConnection(&command)
+				}
+			case command, ok := <-bc.commandStack:
+				if ok {
+					retryCommand = bc.connectToVehicleAndOperateConnection(&command)
+				}
 			}
 		}
 	}
 }
 
-func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}) {
+func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *ApiResponse) {
 	bc.commandStack <- Command{
-		Command: command,
-		Vin:     vin,
-		Body:    body,
+		Command:  command,
+		Vin:      vin,
+		Body:     body,
+		Response: response,
 	}
-	/*bc.commandStack.Push(Command{
-		Command: command,
-		Vin:     vin,
-		Body:    body,
-	})*/
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command) *Command {
@@ -215,6 +220,21 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 		case <-timeout:
 			log.Debug("connection Timeout")
 			return nil
+		case command, ok := <-bc.providerStack:
+			if !ok {
+				return nil
+			}
+
+			//If new VIN, close connection
+			if command.Vin != firstCommand.Vin {
+				log.Debug("new VIN, so close connection")
+				return &command
+			}
+
+			cmd, err := bc.executeCommand(car, &command)
+			if err != nil {
+				return cmd
+			}
 		case command, ok := <-bc.commandStack:
 			if !ok {
 				return nil
@@ -268,6 +288,11 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*C
 		}
 	}
 	log.Error("canceled", "command", command.Command, "body", command.Body, "err", lastErr)
+	if command.Response != nil {
+		command.Response.Error = lastErr.Error()
+		command.Response.Result = false
+		command.Response.Finished = true
+	}
 	return nil, lastErr
 }
 
@@ -375,6 +400,20 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 		} else {
 			log.Info(fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", car.VIN()))
 		}
+	case "vehicle_data":
+		category, err := GetCategory("charge")
+		if err != nil {
+			return false, fmt.Errorf("unrecognized state category charge")
+		}
+		data, err := car.GetState(ctx, category)
+		if err != nil {
+			return true, fmt.Errorf("failed to get vehicle data: %s", err)
+		}
+		dataStr := protojson.Format(data)
+		command.Response.Response = dataStr
+		command.Response.Result = true
+		command.Response.Finished = true
+		//log.Info("vehicle data", "response", *command.Response)
 	}
 
 	// everything fine
