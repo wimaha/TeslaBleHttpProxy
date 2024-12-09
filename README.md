@@ -12,6 +12,8 @@ The program stores the received requests in a queue and processes them one by on
 - [Generate key for vehicle](#generate-key-for-vehicle)
 - [Setup EVCC](#setup-evcc)
 - [API](#api)
+  - [Vehicle Commands](#vehicle-commands)
+  - [Vehicle Data](#vehicle-data)
 
 ## How to install
 
