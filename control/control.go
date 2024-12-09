@@ -1,11 +1,10 @@
 package control
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
+	"github.com/wimaha/TeslaBleHttpProxy/converter"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -403,32 +403,57 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 			log.Info(fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", car.VIN()))
 		}
 	case "vehicle_data":
-		category, err := GetCategory("charge")
-		if err != nil {
-			return false, fmt.Errorf("unrecognized state category charge")
-		}
-		data, err := car.GetState(ctx, category)
-		if err != nil {
-			return true, fmt.Errorf("failed to get vehicle data: %s", err)
-		}
-		d, err := protojson.Marshal(data)
-		if err != nil {
-			return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
-		}
+		var endpoints = command.Body["endpoints"].([]string)
 
-		//Flatten the response to a single level of keys
-		var r = regexp.MustCompile(`":{"(?P<value>[a-zA-Z]*)":{}}`)
-		match := r.FindAllSubmatch(d, -1)
-
-		for _, sm := range match {
-			if len(sm) != 2 {
-				continue
+		response := make(map[string]json.RawMessage)
+		for _, endpoint := range endpoints {
+			log.Debugf("get: %s", endpoint)
+			category, err := GetCategory(endpoint)
+			if err != nil {
+				return false, fmt.Errorf("unrecognized state category charge")
 			}
-			tb := append(append([]byte(`":"`), sm[1]...), '"')
-			d = bytes.ReplaceAll(d, sm[0], tb)
+			data, err := car.GetState(ctx, category)
+			if err != nil {
+				return true, fmt.Errorf("failed to get vehicle data: %s", err)
+			}
+			d, err := protojson.Marshal(data)
+			if err != nil {
+				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
+			}
+
+			log.Debugf("data: %s", d)
+
+			var converted interface{}
+			switch endpoint {
+			case "charge_state":
+				converted = converter.ChargeStateFromBle(data)
+			case "climate_state":
+				converted = converter.ClimateStateFromBle(data)
+			}
+			d, err = json.Marshal(converted)
+			if err != nil {
+				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
+			}
+
+			/*//Flatten the response to a single level of keys
+			var r = regexp.MustCompile(`":{"(?P<value>[a-zA-Z]*)":{}}`)
+			match := r.FindAllSubmatch(d, -1)
+
+			for _, sm := range match {
+				if len(sm) != 2 {
+					continue
+				}
+				tb := append(append([]byte(`":"`), sm[1]...), '"')
+				d = bytes.ReplaceAll(d, sm[0], tb)
+			}*/
+			response[endpoint] = d
 		}
 
-		command.Response.Response = d
+		responseJson, err := json.Marshal(response)
+		if err != nil {
+			return false, fmt.Errorf("failed to marshal vehicle data: %s", err)
+		}
+		command.Response.Response = responseJson
 		command.Response.Result = true
 		command.Response.Finished = true
 		//log.Info("vehicle data", "response", *command.Response)

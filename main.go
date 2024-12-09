@@ -22,11 +22,11 @@ type Ret struct {
 }
 
 type Response struct {
-	Result   bool             `json:"result"`
-	Reason   string           `json:"reason"`
-	Vin      string           `json:"vin"`
-	Command  string           `json:"command"`
-	Response *json.RawMessage `json:"response,omitempty"`
+	Result   bool            `json:"result"`
+	Reason   string          `json:"reason"`
+	Vin      string          `json:"vin"`
+	Command  string          `json:"command"`
+	Response json.RawMessage `json:"response,omitempty"`
 }
 
 var exceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
@@ -128,9 +128,17 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 	vin := params["vin"]
 	command := "vehicle_data"
 
+	var endpoints []string
+	entpointsString := r.URL.Query().Get("endpoints")
+	if entpointsString != "" {
+		endpoints = strings.Split(entpointsString, ";")
+	} else {
+		endpoints = []string{"charge_state", "climate_state", "closures_state"} //'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
+	}
+
 	var apiResponse control.ApiResponse
 
-	control.BleControlInstance.PushCommand(command, vin, nil, &apiResponse)
+	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
 
 	var response Response
 	response.Vin = vin
@@ -167,7 +175,7 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 	if apiResponse.Result {
 		response.Result = true
 		response.Reason = "The command was successfully processed."
-		response.Response = &apiResponse.Response
+		response.Response = apiResponse.Response
 	} else {
 		response.Result = false
 		response.Reason = apiResponse.Error

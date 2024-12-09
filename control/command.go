@@ -22,11 +22,12 @@ type Command struct {
 	Response *ApiResponse
 }
 
+// 'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
 var categoriesByName = map[string]vehicle.StateCategory{
-	"charge":                vehicle.StateCategoryCharge,
-	"climate":               vehicle.StateCategoryClimate,
+	"charge_state":          vehicle.StateCategoryCharge,
+	"climate_state":         vehicle.StateCategoryClimate,
 	"drive":                 vehicle.StateCategoryDrive,
-	"closures":              vehicle.StateCategoryClosures,
+	"closures_state":        vehicle.StateCategoryClosures,
 	"charge-schedule":       vehicle.StateCategoryChargeSchedule,
 	"precondition-schedule": vehicle.StateCategoryPreconditioningSchedule,
 	"tire-pressure":         vehicle.StateCategoryTirePressure,
