@@ -121,12 +121,26 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command
 		} else if !retry {
 			//Failed but no retry possible
 			log.Error("can't connect to vehicle", "error", err)
+			if firstCommand.Response != nil {
+				firstCommand.Response.Error = err.Error()
+				firstCommand.Response.Result = false
+				if firstCommand.Response.Wait != nil {
+					firstCommand.Response.Wait.Done()
+				}
+			}
 			return nil
 		} else {
 			lastErr = err
 		}
 	}
 	log.Error(fmt.Sprintf("stop retrying after %d attempts", retryCount), "error", lastErr)
+	if firstCommand.Response != nil {
+		firstCommand.Response.Error = lastErr.Error()
+		firstCommand.Response.Result = false
+		if firstCommand.Response.Wait != nil {
+			firstCommand.Response.Wait.Done()
+		}
+	}
 	return nil
 }
 
@@ -256,7 +270,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 	}
 }
 
-func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*Command, error) {
+func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (retryCommand *Command, retErr error) {
 	log.Info("sending", "command", command.Command, "body", command.Body)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -264,6 +278,20 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*C
 	var sleep = 3 * time.Second
 	var retryCount = 3
 	var lastErr error
+
+	defer func() {
+		if command.Response != nil {
+			if retErr != nil {
+				command.Response.Error = retErr.Error()
+				command.Response.Result = false
+			} else {
+				command.Response.Result = true
+			}
+			if command.Response.Wait != nil && retryCommand == nil {
+				command.Response.Wait.Done()
+			}
+		}
+	}()
 
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
@@ -290,11 +318,6 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (*C
 		}
 	}
 	log.Error("canceled", "command", command.Command, "body", command.Body, "err", lastErr)
-	if command.Response != nil {
-		command.Response.Error = lastErr.Error()
-		command.Response.Result = false
-		command.Response.Finished = true
-	}
 	return nil, lastErr
 }
 
@@ -421,7 +444,7 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
 			}
 
-			log.Debugf("data: %s", d)
+			//log.Debugf("data: %s", d)
 
 			var converted interface{}
 			switch endpoint {
@@ -435,17 +458,6 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
 			}
 
-			/*//Flatten the response to a single level of keys
-			var r = regexp.MustCompile(`":{"(?P<value>[a-zA-Z]*)":{}}`)
-			match := r.FindAllSubmatch(d, -1)
-
-			for _, sm := range match {
-				if len(sm) != 2 {
-					continue
-				}
-				tb := append(append([]byte(`":"`), sm[1]...), '"')
-				d = bytes.ReplaceAll(d, sm[0], tb)
-			}*/
 			response[endpoint] = d
 		}
 
@@ -454,9 +466,6 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 			return false, fmt.Errorf("failed to marshal vehicle data: %s", err)
 		}
 		command.Response.Response = responseJson
-		command.Response.Result = true
-		command.Response.Finished = true
-		//log.Info("vehicle data", "response", *command.Response)
 	}
 
 	// everything fine

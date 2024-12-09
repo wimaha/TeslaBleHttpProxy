@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
 type ApiResponse struct {
-	Finished bool
+	Wait     *sync.WaitGroup
 	Result   bool
 	Error    string
 	Response json.RawMessage

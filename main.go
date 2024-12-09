@@ -8,7 +8,7 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/charmbracelet/log"
 	"github.com/wimaha/TeslaBleHttpProxy/control"
@@ -137,7 +137,10 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var apiResponse control.ApiResponse
+	wg := sync.WaitGroup{}
+	apiResponse.Wait = &wg
 
+	wg.Add(1)
 	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
 
 	var response Response
@@ -165,12 +168,7 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for {
-		if apiResponse.Finished {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	wg.Wait()
 
 	if apiResponse.Result {
 		response.Result = true
@@ -181,13 +179,3 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 		response.Reason = apiResponse.Error
 	}
 }
-
-/*func pushCommand(command string, vin string, body map[string]interface{}) error {
-	if bleControl == nil {
-		return fmt.Errorf("BleControl is not initialized. Maybe private.pem is missing.")
-	}
-
-	bleControl.PushCommand(command, vin, body)
-
-	return nil
-}*/
