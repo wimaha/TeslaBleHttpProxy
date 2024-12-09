@@ -133,6 +133,8 @@ vehicles:
 
 ## API
 
+### Vehicle Commands
+
 The program uses the same interfaces as the Tesla [Fleet API](https://developer.tesla.com/docs/fleet-api#vehicle-commands). Currently, the following requests are supported: 
 
 - wake_up
@@ -146,7 +148,33 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - charge_port_door_close
 - flash_lights
 
+#### Example Request
 
+Start charging:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start`
 
+Stop charging:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_stop`
 
+Set charging amps to 5A:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_charging_amps` with body `{"charging_amps": "5"}`
 
+### Vehicle Data
+
+The vehicle data is fetched from the vehicle and returned in the response in the same format as the [Fleet API](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-endpoints#vehicle-data). Since a ble connection has to be established to fetch the data, it takes a few seconds before the data is returned.
+
+#### Example Request
+
+Get vehicle data:
+`http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data`
+
+Currently you will receive the following data:
+
+- charge_state
+- climate_state
+
+If you want to receive specific data, you can add the endpoints to the request. For example:
+
+`http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=charge_state`
+
+This is recommended if you want to receive data frequently, since it will reduce the time it takes to receive the data.

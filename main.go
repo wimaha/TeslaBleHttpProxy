@@ -133,7 +133,7 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 	if entpointsString != "" {
 		endpoints = strings.Split(entpointsString, ";")
 	} else {
-		endpoints = []string{"charge_state", "climate_state", "closures_state"} //'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
+		endpoints = []string{"charge_state", "climate_state"} //'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
 	}
 
 	var apiResponse control.ApiResponse
