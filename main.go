@@ -22,11 +22,11 @@ type Ret struct {
 }
 
 type Response struct {
-	Result   bool         `json:"result"`
-	Reason   string       `json:"reason"`
-	Vin      string       `json:"vin"`
-	Command  string       `json:"command"`
-	Response *interface{} `json:"response,omitempty"`
+	Result   bool             `json:"result"`
+	Reason   string           `json:"reason"`
+	Vin      string           `json:"vin"`
+	Command  string           `json:"command"`
+	Response *json.RawMessage `json:"response,omitempty"`
 }
 
 var exceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}

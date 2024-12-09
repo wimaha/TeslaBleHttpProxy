@@ -1,6 +1,7 @@
 package control
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -11,7 +12,7 @@ type ApiResponse struct {
 	Finished bool
 	Result   bool
 	Error    string
-	Response interface{}
+	Response json.RawMessage
 }
 
 type Command struct {

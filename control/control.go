@@ -1,9 +1,11 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -409,8 +411,24 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 		if err != nil {
 			return true, fmt.Errorf("failed to get vehicle data: %s", err)
 		}
-		dataStr := protojson.Format(data)
-		command.Response.Response = dataStr
+		d, err := protojson.Marshal(data)
+		if err != nil {
+			return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
+		}
+
+		//Flatten the response to a single level of keys
+		var r = regexp.MustCompile(`":{"(?P<value>[a-zA-Z]*)":{}}`)
+		match := r.FindAllSubmatch(d, -1)
+
+		for _, sm := range match {
+			if len(sm) != 2 {
+				continue
+			}
+			tb := append(append([]byte(`":"`), sm[1]...), '"')
+			d = bytes.ReplaceAll(d, sm[0], tb)
+		}
+
+		command.Response.Response = d
 		command.Response.Result = true
 		command.Response.Finished = true
 		//log.Info("vehicle data", "response", *command.Response)
