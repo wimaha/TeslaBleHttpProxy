@@ -8,9 +8,9 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/log"
-	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
 	"github.com/wimaha/TeslaBleHttpProxy/control"
 	"github.com/wimaha/TeslaBleHttpProxy/html"
 
@@ -22,25 +22,26 @@ type Ret struct {
 }
 
 type Response struct {
-	Result  bool   `json:"result"`
-	Reason  string `json:"reason"`
-	Vin     string `json:"vin"`
-	Command string `json:"command"`
+	Result   bool            `json:"result"`
+	Reason   string          `json:"reason"`
+	Vin      string          `json:"vin"`
+	Command  string          `json:"command"`
+	Response json.RawMessage `json:"response,omitempty"`
 }
 
-var exceptedCommands = []string{"auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
+var exceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
 
 //go:embed static/*
 var static embed.FS
 
 func main() {
-	log.Info("TeslaBleHttpProxy 1.2.7 is loading ...")
+	log.Info("TeslaBleHttpProxy 1.3.0 is loading ...")
 
 	envLogLevel := os.Getenv("logLevel")
 	if envLogLevel == "debug" {
 		log.SetLevel(log.DebugLevel)
 		log.Debug("LogLevel set to debug")
-		ble.SetDebugLog()
+		//ble.SetDebugLog()
 	}
 
 	addr := os.Getenv("httpListenAddress")
@@ -56,6 +57,7 @@ func main() {
 	// Define the endpoints
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
+	router.HandleFunc("/api/1/vehicles/{vin}/vehicle_data", receiveVehicleData).Methods("GET")
 	router.HandleFunc("/dashboard", html.ShowDashboard).Methods("GET")
 	router.HandleFunc("/gen_keys", html.GenKeys).Methods("GET")
 	router.HandleFunc("/remove_keys", html.RemoveKeys).Methods("GET")
@@ -115,18 +117,65 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	control.BleControlInstance.PushCommand(command, vin, body)
+	control.BleControlInstance.PushCommand(command, vin, body, nil)
 
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
 
-/*func pushCommand(command string, vin string, body map[string]interface{}) error {
-	if bleControl == nil {
-		return fmt.Errorf("BleControl is not initialized. Maybe private.pem is missing.")
+func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	vin := params["vin"]
+	command := "vehicle_data"
+
+	var endpoints []string
+	entpointsString := r.URL.Query().Get("endpoints")
+	if entpointsString != "" {
+		endpoints = strings.Split(entpointsString, ";")
+	} else {
+		endpoints = []string{"charge_state", "climate_state"} //'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
 	}
 
-	bleControl.PushCommand(command, vin, body)
+	var apiResponse control.ApiResponse
+	wg := sync.WaitGroup{}
+	apiResponse.Wait = &wg
 
-	return nil
-}*/
+	wg.Add(1)
+	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
+
+	var response Response
+	response.Vin = vin
+	response.Command = command
+
+	defer func() {
+		//var ret Ret
+		//ret.Response = response
+
+		w.Header().Set("Content-Type", "application/json")
+		if response.Result {
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Fatal("failed to send response", "error", err)
+		}
+	}()
+
+	if control.BleControlInstance == nil {
+		response.Reason = "BleControl is not initialized. Maybe private.pem is missing."
+		response.Result = false
+		return
+	}
+
+	wg.Wait()
+
+	if apiResponse.Result {
+		response.Result = true
+		response.Reason = "The command was successfully processed."
+		response.Response = apiResponse.Response
+	} else {
+		response.Result = false
+		response.Reason = apiResponse.Error
+	}
+}
