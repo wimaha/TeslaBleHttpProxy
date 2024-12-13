@@ -158,6 +158,8 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 
 #### Example Request
 
+*(All requests with method POST.)*
+
 Start charging:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start`
 
@@ -172,6 +174,8 @@ Set charging amps to 5A:
 The vehicle data is fetched from the vehicle and returned in the response in the same format as the [Fleet API](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-endpoints#vehicle-data). Since a ble connection has to be established to fetch the data, it takes a few seconds before the data is returned.
 
 #### Example Request
+
+*(All requests with method GET.)*
 
 Get vehicle data:
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data`
