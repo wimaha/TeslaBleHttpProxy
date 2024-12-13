@@ -78,33 +78,14 @@ You can now close the dashboard and use the proxy. 🙂
 
 ## Setup EVCC
 
-***Since version 0.128.0 or newer of evcc it is very easy to integrate ble proxy:***
-```
-- name: model3
-    type: template
-    template: tesla
-    title: Tesla
-    icon: car
-    commandProxy: http://YOUR_IP:8080
-    accessToken: YOUR_ACCESS_TOKEN
-    refreshToken: YOUR_REFRSH_TOKEN
-    capacity: 60
-    vin: YOUR_VIN
-```
-
-(Hint for multiple vehicle support: https://github.com/wimaha/TeslaBleHttpProxy/issues/40)
-
-If you want to use an older version:
-
-
-***Attention: You have to use at least version 0.127.2 or newer of evcc***
-Below is a sample configuration of a custom vehicle in evcc:
+If you want to use the solely TeslaBleHttpProxy, you can use the following configuration in evcc (recommended):
 
 ```
 vehicles:
-  - name: model3
+  - name: tesla
     type: custom
-    title: Tesla Model 3
+    title: Your Tesla
+    icon: car
     capacity: 60
     chargeenable:
       source: http
@@ -122,16 +103,41 @@ vehicles:
       method: POST
       body: ""
     soc:
-      source: [Your Source ...]
+      source: http
+      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
+      method: GET
+      jq: .response.charge_state.battery_level
+      timeout: 30s 
+    limitsoc:
+      source: http
+      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
+      method: GET
+      jq: .response.charge_state.charge_limit_soc
+      timeout: 30s
     range:
-      source: [Your Source ...]
-    status:
-      source: combined
-      plugged:
-        source: [Your Source ...]
-      charging:
-        source: [Your Source ...]
+      source: http
+      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
+      method: GET
+      jq: .response.charge_state.battery_range
+      timeout: 30s
 ```
+
+If you want to use this proxy only for commands, and not for vehicle data, you can use the following configuration. The vehicle data is then fetched via the Tesla API by evcc.
+
+```
+- name: model3
+    type: template
+    template: tesla
+    title: Tesla
+    icon: car
+    commandProxy: http://YOUR_IP:8080
+    accessToken: YOUR_ACCESS_TOKEN
+    refreshToken: YOUR_REFRSH_TOKEN
+    capacity: 60
+    vin: YOUR_VIN
+```
+
+(Hint for multiple vehicle support: https://github.com/wimaha/TeslaBleHttpProxy/issues/40)
 
 ## API
 
