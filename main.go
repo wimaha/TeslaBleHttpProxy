@@ -78,6 +78,8 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 	vin := params["vin"]
 	command := params["command"]
 
+	wait := r.URL.Query().Get("wait") == "true"
+
 	var response Response
 	response.Vin = vin
 	response.Command = command
@@ -118,8 +120,28 @@ func receiveCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	control.BleControlInstance.PushCommand(command, vin, body, nil)
+	if wait {
+		var apiResponse control.ApiResponse
+		wg := sync.WaitGroup{}
+		apiResponse.Wait = &wg
 
+		wg.Add(1)
+		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse)
+
+		wg.Wait()
+
+		if apiResponse.Result {
+			response.Result = true
+			response.Reason = "The command was successfully processed."
+			response.Response = apiResponse.Response
+		} else {
+			response.Result = false
+			response.Reason = apiResponse.Error
+		}
+		return
+	}
+
+	control.BleControlInstance.PushCommand(command, vin, body, nil)
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
@@ -150,13 +172,6 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var apiResponse control.ApiResponse
-	wg := sync.WaitGroup{}
-	apiResponse.Wait = &wg
-
-	wg.Add(1)
-	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
-
 	defer func() {
 		//var ret Ret
 		//ret.Response = response
@@ -178,11 +193,18 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var apiResponse control.ApiResponse
+	wg := sync.WaitGroup{}
+	apiResponse.Wait = &wg
+
+	wg.Add(1)
+	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
+
 	wg.Wait()
 
 	if apiResponse.Result {
 		response.Result = true
-		response.Reason = "The command was successfully processed."
+		response.Reason = "The request was successfully processed."
 		response.Response = apiResponse.Response
 	} else {
 		response.Result = false
