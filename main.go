@@ -11,10 +11,10 @@ import (
 	"sync"
 
 	"github.com/charmbracelet/log"
+	"github.com/gorilla/mux"
 	"github.com/wimaha/TeslaBleHttpProxy/control"
 	"github.com/wimaha/TeslaBleHttpProxy/html"
-
-	"github.com/gorilla/mux"
+	"github.com/wimaha/TeslaBleHttpProxy/special"
 )
 
 type Ret struct {
@@ -59,6 +59,7 @@ func main() {
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", receiveCommand).Methods("POST")
 	router.HandleFunc("/api/1/vehicles/{vin}/vehicle_data", receiveVehicleData).Methods("GET")
+	router.HandleFunc("/api/1/vehicles/{vin}/body-controller-state", special.ReceiveBodyControllerState).Methods("GET")
 	router.HandleFunc("/dashboard", html.ShowDashboard).Methods("GET")
 	router.HandleFunc("/gen_keys", html.GenKeys).Methods("GET")
 	router.HandleFunc("/remove_keys", html.RemoveKeys).Methods("GET")

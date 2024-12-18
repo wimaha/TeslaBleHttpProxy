@@ -198,21 +198,23 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
 		}
 
-		if err := car.Wakeup(ctx); err != nil {
-			return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
-		} else {
-			log.Debug("car successfully wakeup")
-		}
+		if firstCommand.Domain != Domain.VCSEC {
+			if err := car.Wakeup(ctx); err != nil {
+				return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+			} else {
+				log.Debug("car successfully wakeup")
+			}
 
-		log.Debug("start Infotainment session...")
-		// Then we can also connect the infotainment
-		if err := car.StartSession(ctx, []universalmessage.Domain{
-			protocol.DomainVCSEC,
-			protocol.DomainInfotainment,
-		}); err != nil {
-			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+			log.Debug("start Infotainment session...")
+			// Then we can also connect the infotainment
+			if err := car.StartSession(ctx, []universalmessage.Domain{
+				protocol.DomainVCSEC,
+				protocol.DomainInfotainment,
+			}); err != nil {
+				return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+			}
+			log.Info("connection established")
 		}
-		log.Info("connection established")
 	} else {
 		log.Info("Key-Request connection established")
 	}
@@ -331,6 +333,16 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 		if err := car.ClimateOff(ctx); err != nil {
 			return true, fmt.Errorf("failed to stop auto conditioning: %s", err)
 		}
+	case "body-controller-state":
+		info, err := car.BodyControllerState(ctx)
+		if err != nil {
+			return true, fmt.Errorf("failed to get body controller state: %s", err)
+		}
+		d, err := protojson.Marshal(info)
+		if err != nil {
+			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
+		}
+		fmt.Printf("%s\n", d)
 	case "charge_port_door_open":
 		if err := car.ChargePortOpen(ctx); err != nil {
 			return true, fmt.Errorf("failed to open charge port: %s", err)

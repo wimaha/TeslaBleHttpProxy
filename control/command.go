@@ -16,8 +16,21 @@ type ApiResponse struct {
 	Response json.RawMessage
 }
 
+type DomainType string
+
+var Domain = struct {
+	None         DomainType
+	VCSEC        DomainType
+	Infotainment DomainType
+}{
+	None:         "",
+	VCSEC:        "vcsec",
+	Infotainment: "infotainment",
+}
+
 type Command struct {
 	Command  string
+	Domain   DomainType
 	Vin      string
 	Body     map[string]interface{}
 	Response *ApiResponse
