@@ -30,6 +30,7 @@ type Response struct {
 }
 
 var exceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
+var exceptedEndpoints = []string{"charge_state", "climate_state"}
 
 //go:embed static/*
 var static embed.FS
@@ -129,11 +130,24 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 	command := "vehicle_data"
 
 	var endpoints []string
-	entpointsString := r.URL.Query().Get("endpoints")
-	if entpointsString != "" {
-		endpoints = strings.Split(entpointsString, ";")
+	endpointsString := r.URL.Query().Get("endpoints")
+	if endpointsString != "" {
+		endpoints = strings.Split(endpointsString, ";")
 	} else {
 		endpoints = []string{"charge_state", "climate_state"} //'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
+	}
+
+	var response Response
+	response.Vin = vin
+	response.Command = command
+
+	for _, endpoint := range endpoints {
+		if !slices.Contains(exceptedEndpoints, endpoint) {
+			log.Error("not supported", "endpoint", endpoint)
+			response.Reason = fmt.Sprintf("The endpoint \"%s\" is not supported.", endpoint)
+			response.Result = false
+			return
+		}
 	}
 
 	var apiResponse control.ApiResponse
@@ -142,10 +156,6 @@ func receiveVehicleData(w http.ResponseWriter, r *http.Request) {
 
 	wg.Add(1)
 	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
-
-	var response Response
-	response.Vin = vin
-	response.Command = command
 
 	defer func() {
 		//var ret Ret
