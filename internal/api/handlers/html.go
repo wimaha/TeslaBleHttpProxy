@@ -1,4 +1,4 @@
-package html
+package handlers
 
 import (
 	"embed"
@@ -9,14 +9,15 @@ import (
 	"text/template"
 
 	"github.com/charmbracelet/log"
-	"github.com/wimaha/TeslaBleHttpProxy/control"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
 )
 
 type DashboardParams struct {
 	PrivateKey    string
 	PublicKey     string
 	ShouldGenKeys bool
-	Messages      []Message
+	Messages      []models.Message
 }
 
 func ShowDashboard(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +34,7 @@ func ShowDashboard(w http.ResponseWriter, r *http.Request) {
 		shouldGenKeys = false
 	}
 
-	messages := MainMessageStack.PopAll()
+	messages := models.MainMessageStack.PopAll()
 
 	p := DashboardParams{
 		PrivateKey:    privateKey,
@@ -51,16 +52,16 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		control.SetupBleControl()
-		MainMessageStack.Push(Message{
+		models.MainMessageStack.Push(models.Message{
 			Title:   "Success",
 			Message: "Keys successfully generated and saved.",
-			Type:    Success,
+			Type:    models.Success,
 		})
 	} else {
-		MainMessageStack.Push(Message{
+		models.MainMessageStack.Push(models.Message{
 			Title:   "Error",
 			Message: err.Error(),
-			Type:    Error,
+			Type:    models.Error,
 		})
 	}
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -70,24 +71,24 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 	err1, err2 := control.RemoveKeyFiles()
 
 	if err1 != nil {
-		MainMessageStack.Push(Message{
+		models.MainMessageStack.Push(models.Message{
 			Title:   "Error",
 			Message: err1.Error(),
-			Type:    Error,
+			Type:    models.Error,
 		})
 	}
 	if err2 != nil {
-		MainMessageStack.Push(Message{
+		models.MainMessageStack.Push(models.Message{
 			Title:   "Error",
 			Message: err2.Error(),
-			Type:    Error,
+			Type:    models.Error,
 		})
 	}
 	if err1 == nil && err2 == nil {
-		MainMessageStack.Push(Message{
+		models.MainMessageStack.Push(models.Message{
 			Title:   "Success",
 			Message: "Keys successfully removed.",
-			Type:    Success,
+			Type:    models.Success,
 		})
 	}
 
@@ -108,10 +109,10 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 		vin := r.FormValue("VIN")
 
 		if vin == "" {
-			MainMessageStack.Push(Message{
+			models.MainMessageStack.Push(models.Message{
 				Title:   "Error",
 				Message: "No VIN entered.",
-				Type:    Error,
+				Type:    models.Error,
 			})
 			return
 		}
@@ -119,16 +120,16 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 		err := control.SendKeysToVehicle(vin)
 
 		if err != nil {
-			MainMessageStack.Push(Message{
+			models.MainMessageStack.Push(models.Message{
 				Title:   "Error",
 				Message: err.Error(),
-				Type:    Error,
+				Type:    models.Error,
 			})
 		} else {
-			MainMessageStack.Push(Message{
+			models.MainMessageStack.Push(models.Message{
 				Title:   "Success",
 				Message: fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", vin),
-				Type:    Success,
+				Type:    models.Success,
 			})
 		}
 	}

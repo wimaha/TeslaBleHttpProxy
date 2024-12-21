@@ -1,4 +1,4 @@
-package html
+package models
 
 type MessageType int
 

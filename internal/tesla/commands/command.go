@@ -1,20 +1,12 @@
-package control
+package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 )
-
-type ApiResponse struct {
-	Wait     *sync.WaitGroup
-	Result   bool
-	Error    string
-	Response json.RawMessage
-}
 
 type DomainType string
 
@@ -33,7 +25,7 @@ type Command struct {
 	Domain   DomainType
 	Vin      string
 	Body     map[string]interface{}
-	Response *ApiResponse
+	Response *models.ApiResponse
 }
 
 // 'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'

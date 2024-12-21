@@ -15,7 +15,8 @@ import (
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
-	"github.com/wimaha/TeslaBleHttpProxy/converter"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -41,8 +42,8 @@ func CloseBleControl() {
 type BleControl struct {
 	privateKey protocol.ECDHPrivateKey
 
-	commandStack  chan Command
-	providerStack chan Command
+	commandStack  chan commands.Command
+	providerStack chan commands.Command
 }
 
 func NewBleControl() (*BleControl, error) {
@@ -56,13 +57,13 @@ func NewBleControl() (*BleControl, error) {
 
 	return &BleControl{
 		privateKey:    privateKey,
-		commandStack:  make(chan Command, 50),
-		providerStack: make(chan Command),
+		commandStack:  make(chan commands.Command, 50),
+		providerStack: make(chan commands.Command),
 	}, nil
 }
 
 func (bc *BleControl) Loop() {
-	var retryCommand *Command
+	var retryCommand *commands.Command
 	for {
 		time.Sleep(1 * time.Second)
 		if retryCommand != nil {
@@ -83,8 +84,8 @@ func (bc *BleControl) Loop() {
 	}
 }
 
-func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *ApiResponse) {
-	bc.commandStack <- Command{
+func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse) {
+	bc.commandStack <- commands.Command{
 		Command:  command,
 		Vin:      vin,
 		Body:     body,
@@ -92,7 +93,7 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 	}
 }
 
-func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command) *Command {
+func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
 	log.Info("connecting to Vehicle ...")
 
 	var sleep = 3 * time.Second
@@ -109,7 +110,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command
 		log.Debug("trying connecting to vehicle", "attempt", i+1)
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		conn, car, retry, err := bc.tryConnectToVehicle(ctx, firstCommand)
+		conn, car, retry, err := bc.TryConnectToVehicle(ctx, firstCommand)
 		if err == nil {
 			//Successful
 			defer conn.Close()
@@ -144,7 +145,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *Command
 	return nil
 }
 
-func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
+func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *commands.Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
 	log.Debug("connecting to vehicle (A)...")
 	var conn *ble.Connection
 	var car *vehicle.Vehicle
@@ -198,7 +199,7 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
 		}
 
-		if firstCommand.Domain != Domain.VCSEC {
+		if firstCommand.Domain != commands.Domain.VCSEC {
 			if err := car.Wakeup(ctx); err != nil {
 				return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 			} else {
@@ -224,9 +225,9 @@ func (bc *BleControl) tryConnectToVehicle(ctx context.Context, firstCommand *Com
 	return conn, car, false, nil
 }
 
-func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Command) *Command {
+func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
 	if firstCommand.Command != "wake_up" {
-		cmd, err := bc.executeCommand(car, firstCommand)
+		cmd, err := bc.ExecuteCommand(car, firstCommand)
 		if err != nil {
 			return cmd
 		}
@@ -249,7 +250,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 				return &command
 			}
 
-			cmd, err := bc.executeCommand(car, &command)
+			cmd, err := bc.ExecuteCommand(car, &command)
 			if err != nil {
 				return cmd
 			}
@@ -264,7 +265,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 				return &command
 			}
 
-			cmd, err := bc.executeCommand(car, &command)
+			cmd, err := bc.ExecuteCommand(car, &command)
 			if err != nil {
 				return cmd
 			}
@@ -272,7 +273,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *Comm
 	}
 }
 
-func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (retryCommand *Command, retErr error) {
+func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command) (retryCommand *commands.Command, retErr error) {
 	log.Info("sending", "command", command.Command, "body", command.Body)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -323,7 +324,7 @@ func (bc *BleControl) executeCommand(car *vehicle.Vehicle, command *Command) (re
 	return nil, lastErr
 }
 
-func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, command *Command) (bool, error) {
+func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, command *commands.Command) (bool, error) {
 	switch command.Command {
 	case "auto_conditioning_start":
 		if err := car.ClimateOn(ctx); err != nil {
@@ -443,7 +444,7 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 		response := make(map[string]json.RawMessage)
 		for _, endpoint := range endpoints {
 			log.Debugf("get: %s", endpoint)
-			category, err := GetCategory(endpoint)
+			category, err := commands.GetCategory(endpoint)
 			if err != nil {
 				return false, fmt.Errorf("unrecognized state category charge")
 			}
@@ -461,9 +462,9 @@ func (bc *BleControl) sendCommand(ctx context.Context, car *vehicle.Vehicle, com
 			var converted interface{}
 			switch endpoint {
 			case "charge_state":
-				converted = converter.ChargeStateFromBle(data)
+				converted = models.ChargeStateFromBle(data)
 			case "climate_state":
-				converted = converter.ClimateStateFromBle(data)
+				converted = models.ClimateStateFromBle(data)
 			}
 			d, err = json.Marshal(converted)
 			if err != nil {
