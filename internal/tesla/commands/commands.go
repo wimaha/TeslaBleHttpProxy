@@ -29,16 +29,6 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.ClimateOff(ctx); err != nil {
 			return true, fmt.Errorf("failed to stop auto conditioning: %s", err)
 		}
-	case "body-controller-state":
-		info, err := car.BodyControllerState(ctx)
-		if err != nil {
-			return true, fmt.Errorf("failed to get body controller state: %s", err)
-		}
-		d, err := protojson.Marshal(info)
-		if err != nil {
-			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
-		}
-		fmt.Printf("%s\n", d)
 	case "charge_port_door_open":
 		if err := car.ChargePortOpen(ctx); err != nil {
 			return true, fmt.Errorf("failed to open charge port: %s", err)
@@ -174,6 +164,16 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			return false, fmt.Errorf("failed to marshal vehicle data: %s", err)
 		}
 		command.Response.Response = responseJson
+	case "body-controller-state":
+		info, err := car.BodyControllerState(ctx)
+		if err != nil {
+			return true, fmt.Errorf("failed to get body controller state: %s", err)
+		}
+		d, err := protojson.Marshal(info)
+		if err != nil {
+			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
+		}
+		command.Response.Response = d
 	}
 
 	// everything fine

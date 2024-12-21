@@ -1,9 +1,9 @@
 package handlers
 
 import (
-	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"text/template"
@@ -21,30 +21,32 @@ type DashboardParams struct {
 	Messages      []models.Message
 }
 
-func ShowDashboard(w http.ResponseWriter, r *http.Request) {
-	var shouldGenKeys = true
-	var privateKey = "- missing -"
-	if _, err := os.Stat(config.PrivateKeyFile); err == nil {
-		privateKey = "private.pem"
-		shouldGenKeys = false
-	}
+func ShowDashboard(html fs.FS) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var shouldGenKeys = true
+		var privateKey = "- missing -"
+		if _, err := os.Stat(config.PrivateKeyFile); err == nil {
+			privateKey = "private.pem"
+			shouldGenKeys = false
+		}
 
-	var publicKey = "- missing -"
-	if _, err := os.Stat(config.PublicKeyFile); err == nil {
-		publicKey = "public.pem"
-		shouldGenKeys = false
-	}
+		var publicKey = "- missing -"
+		if _, err := os.Stat(config.PublicKeyFile); err == nil {
+			publicKey = "public.pem"
+			shouldGenKeys = false
+		}
 
-	messages := models.MainMessageStack.PopAll()
+		messages := models.MainMessageStack.PopAll()
 
-	p := DashboardParams{
-		PrivateKey:    privateKey,
-		PublicKey:     publicKey,
-		ShouldGenKeys: shouldGenKeys,
-		Messages:      messages,
-	}
-	if err := Dashboard(w, p, ""); err != nil {
-		log.Error("error showing dashboard", "error", err)
+		p := DashboardParams{
+			PrivateKey:    privateKey,
+			PublicKey:     publicKey,
+			ShouldGenKeys: shouldGenKeys,
+			Messages:      messages,
+		}
+		if err := Dashboard(w, p, "", html); err != nil {
+			log.Error("error showing dashboard", "error", err)
+		}
 	}
 }
 
@@ -136,19 +138,14 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//go:embed *
-var html embed.FS
-
-func parse(file string) *template.Template {
+func parse(file string, html fs.FS) *template.Template {
 	return template.Must(
-		template.New("layout.html").ParseFS(html, "layout.html", file))
+		template.New("html/layout.html").ParseFS(html, "html/layout.html", "html/"+file))
 }
 
-func Dashboard(w io.Writer, p DashboardParams, partial string) error {
+func Dashboard(w io.Writer, p DashboardParams, partial string, html fs.FS) error {
 	if partial == "" {
 		partial = "layout.html"
 	}
-	return dashboard.ExecuteTemplate(w, partial, p)
+	return parse("dashboard.html", html).ExecuteTemplate(w, partial, p)
 }
-
-var dashboard = parse("dashboard.html")

@@ -8,7 +8,7 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/handlers"
 )
 
-func SetupRoutes(static embed.FS) *mux.Router {
+func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	router := mux.NewRouter()
 
 	// Define the endpoints
@@ -16,7 +16,7 @@ func SetupRoutes(static embed.FS) *mux.Router {
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", handlers.Command).Methods("POST")
 	router.HandleFunc("/api/1/vehicles/{vin}/vehicle_data", handlers.VehicleData).Methods("GET")
 	router.HandleFunc("/api/1/vehicles/{vin}/body_controller_state", handlers.BodyControllerState).Methods("GET")
-	router.HandleFunc("/dashboard", handlers.ShowDashboard).Methods("GET")
+	router.HandleFunc("/dashboard", handlers.ShowDashboard(html)).Methods("GET")
 	router.HandleFunc("/gen_keys", handlers.GenKeys).Methods("GET")
 	router.HandleFunc("/remove_keys", handlers.RemoveKeys).Methods("GET")
 	router.HandleFunc("/send_key", handlers.SendKey).Methods("POST")

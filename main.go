@@ -13,6 +13,9 @@ import (
 //go:embed static/*
 var static embed.FS
 
+//go:embed html/*
+var html embed.FS
+
 func main() {
 	log.Info("TeslaBleHttpProxy 2.0.0 is loading ...")
 
@@ -20,7 +23,7 @@ func main() {
 
 	control.SetupBleControl()
 
-	router := routes.SetupRoutes(static)
+	router := routes.SetupRoutes(static, html)
 
 	log.Info("TeslaBleHttpProxy is running!")
 	log.Fatal(http.ListenAndServe(config.HttpListenAddress, router))

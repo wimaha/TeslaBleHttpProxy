@@ -17,6 +17,30 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
+func commonDefer(w http.ResponseWriter, response *models.Response) {
+	var ret models.Ret
+	ret.Response = *response
+
+	w.Header().Set("Content-Type", "application/json")
+	if response.Result {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
+	if err := json.NewEncoder(w).Encode(ret); err != nil {
+		log.Fatal("failed to send response", "error", err)
+	}
+}
+
+func checkBleControl(response *models.Response) bool {
+	if control.BleControlInstance == nil {
+		response.Reason = "BleControl is not initialized. Maybe private.pem is missing."
+		response.Result = false
+		return false
+	}
+	return true
+}
+
 func Command(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	vin := params["vin"]
@@ -28,24 +52,9 @@ func Command(w http.ResponseWriter, r *http.Request) {
 	response.Vin = vin
 	response.Command = command
 
-	defer func() {
-		var ret models.Ret
-		ret.Response = response
+	defer commonDefer(w, &response)
 
-		w.Header().Set("Content-Type", "application/json")
-		if response.Result {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}
-		if err := json.NewEncoder(w).Encode(ret); err != nil {
-			log.Fatal("failed to send response", "error", err)
-		}
-	}()
-
-	if control.BleControlInstance == nil {
-		response.Reason = "BleControl is not initialized. Maybe private.pem is missing."
-		response.Result = false
+	if !checkBleControl(&response) {
 		return
 	}
 
@@ -116,24 +125,9 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	defer func() {
-		//var ret Ret
-		//ret.Response = response
+	defer commonDefer(w, &response)
 
-		w.Header().Set("Content-Type", "application/json")
-		if response.Result {
-			w.WriteHeader(http.StatusOK)
-		} else {
-			w.WriteHeader(http.StatusServiceUnavailable)
-		}
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Fatal("failed to send response", "error", err)
-		}
-	}()
-
-	if control.BleControlInstance == nil {
-		response.Reason = "BleControl is not initialized. Maybe private.pem is missing."
-		response.Result = false
+	if !checkBleControl(&response) {
 		return
 	}
 
@@ -160,12 +154,25 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	vin := params["vin"]
 
+	var response models.Response
+	response.Vin = vin
+	response.Command = "body-controller-state"
+
+	defer commonDefer(w, &response)
+
+	if !checkBleControl(&response) {
+		return
+	}
+
+	var apiResponse models.ApiResponse
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := &commands.Command{
-		Command: "body-controller-state",
-		Domain:  commands.Domain.VCSEC,
-		Vin:     vin,
+		Command:  "body-controller-state",
+		Domain:   commands.Domain.VCSEC,
+		Vin:      vin,
+		Response: &apiResponse,
 	}
 	conn, car, _, err := control.BleControlInstance.TryConnectToVehicle(ctx, cmd)
 	if err == nil {
@@ -177,11 +184,21 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 
 		_, err := control.BleControlInstance.ExecuteCommand(car, cmd)
 		if err != nil {
+			response.Result = false
+			response.Reason = err.Error()
 			return
 		}
 
-		return
+		if apiResponse.Result {
+			response.Result = true
+			response.Reason = "The request was successfully processed."
+			response.Response = apiResponse.Response
+		} else {
+			response.Result = false
+			response.Reason = apiResponse.Error
+		}
 	} else {
-		return
+		response.Result = false
+		response.Reason = err.Error()
 	}
 }
