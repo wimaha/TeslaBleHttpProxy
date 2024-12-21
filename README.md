@@ -107,19 +107,19 @@ vehicles:
       source: http
       uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
       method: GET
-      jq: .response.charge_state.battery_level
+      jq: .response.response.charge_state.battery_level
       timeout: 30s 
     limitsoc:
       source: http
       uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
       method: GET
-      jq: .response.charge_state.charge_limit_soc
+      jq: .response.response.charge_state.charge_limit_soc
       timeout: 30s
     range:
       source: http
       uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
       method: GET
-      jq: .response.charge_state.battery_range
+      jq: .response.response.charge_state.battery_range
       scale: 1.60934
       timeout: 30s
 ```
