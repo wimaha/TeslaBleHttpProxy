@@ -1,4 +1,4 @@
-package converter
+package models
 
 // ChargeState contains the current charge states that exist within the vehicle.
 type ChargeState struct {

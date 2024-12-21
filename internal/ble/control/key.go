@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/wimaha/TeslaBleHttpProxy/config"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
 func CreatePrivateAndPublicKeyFile() error {
@@ -30,7 +32,7 @@ func CreatePrivateAndPublicKeyFile() error {
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: x509Encoded})
 
 	// Write the PEM-encoded private key to a file
-	privateKeyFile, err := os.Create(PrivateKeyFile)
+	privateKeyFile, err := os.Create(config.PrivateKeyFile)
 	if err != nil {
 		log.Error("Error creating private key file", "err", err)
 		return err
@@ -57,7 +59,7 @@ func CreatePrivateAndPublicKeyFile() error {
 	pemEncodedPublicKey := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
 
 	// Write the PEM-encoded public key to a file
-	publicKeyFile, err := os.Create(PublicKeyFile)
+	publicKeyFile, err := os.Create(config.PublicKeyFile)
 	if err != nil {
 		log.Error("Error creating public key file", "err", err)
 		return err
@@ -76,8 +78,8 @@ func CreatePrivateAndPublicKeyFile() error {
 }
 
 func RemoveKeyFiles() (error, error) {
-	err1 := os.Remove(PrivateKeyFile)
-	err2 := os.Remove(PublicKeyFile)
+	err1 := os.Remove(config.PrivateKeyFile)
+	err2 := os.Remove(config.PublicKeyFile)
 
 	return err1, err2
 }
@@ -85,16 +87,16 @@ func RemoveKeyFiles() (error, error) {
 func SendKeysToVehicle(vin string) error {
 	tempBleControl := &BleControl{
 		privateKey:   nil,
-		commandStack: make(chan Command, 1),
+		commandStack: make(chan commands.Command, 1),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	cmd := &Command{
+	cmd := &commands.Command{
 		Command: "add-key-request",
 		Vin:     vin,
 	}
-	conn, car, _, err := tempBleControl.tryConnectToVehicle(ctx, cmd)
+	conn, car, _, err := tempBleControl.TryConnectToVehicle(ctx, cmd)
 	if err == nil {
 		//Successful
 		defer conn.Close()
@@ -102,7 +104,7 @@ func SendKeysToVehicle(vin string) error {
 		defer car.Disconnect()
 		defer log.Debug("disconnect vehicle (A)")
 
-		_, err := tempBleControl.executeCommand(car, cmd)
+		_, err := tempBleControl.ExecuteCommand(car, cmd)
 		if err != nil {
 			return err
 		}

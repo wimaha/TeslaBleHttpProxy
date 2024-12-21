@@ -14,6 +14,7 @@ The program stores the received requests in a queue and processes them one by on
 - [API](#api)
   - [Vehicle Commands](#vehicle-commands)
   - [Vehicle Data](#vehicle-data)
+  - [Body Controller State](#body-controller-state)
 
 ## How to install
 
@@ -191,3 +192,28 @@ If you want to receive specific data, you can add the endpoints to the request. 
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=charge_state`
 
 This is recommended if you want to receive data frequently, since it will reduce the time it takes to receive the data.
+
+### Body Controller State
+
+The body controller state is fetched from the vehicle and returnes the state of the body controller. The request does not wake up the vehicle. The following information is returned:
+
+- `vehicleLockState`
+  - `VEHICLELOCKSTATE_UNLOCKED`
+  - `VEHICLELOCKSTATE_LOCKED`
+  - `VEHICLELOCKSTATE_INTERNAL_LOCKED`
+  - `VEHICLELOCKSTATE_SELECTIVE_UNLOCKED`
+- `vehicleSleepStatus`
+  - `VEHICLE_SLEEP_STATUS_UNKNOWN`
+  - `VEHICLE_SLEEP_STATUS_AWAKE`
+  - `VEHICLE_SLEEP_STATUS_ASLEEP`
+- `userPresence`
+  - `VEHICLE_USER_PRESENCE_UNKNOWN`
+  - `VEHICLE_USER_PRESENCE_NOT_PRESENT`
+  - `VEHICLE_USER_PRESENCE_PRESENT`
+
+#### Request
+
+*(All requests with method GET.)*
+
+Get body controller state:
+`http://localhost:8080/api/1/vehicles/{VIN}/body_controller_state`
