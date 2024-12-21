@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/charmbracelet/log"
+	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
 )
@@ -23,13 +24,13 @@ type DashboardParams struct {
 func ShowDashboard(w http.ResponseWriter, r *http.Request) {
 	var shouldGenKeys = true
 	var privateKey = "- missing -"
-	if _, err := os.Stat(control.PrivateKeyFile); err == nil {
+	if _, err := os.Stat(config.PrivateKeyFile); err == nil {
 		privateKey = "private.pem"
 		shouldGenKeys = false
 	}
 
 	var publicKey = "- missing -"
-	if _, err := os.Stat(control.PublicKeyFile); err == nil {
+	if _, err := os.Stat(config.PublicKeyFile); err == nil {
 		publicKey = "public.pem"
 		shouldGenKeys = false
 	}

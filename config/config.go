@@ -6,6 +6,9 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+var PublicKeyFile = "key/public.pem"
+var PrivateKeyFile = "key/private.pem"
+
 type Config struct {
 	LogLevel          string
 	HttpListenAddress string
