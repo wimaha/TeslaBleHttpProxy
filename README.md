@@ -158,12 +158,17 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - charge_port_door_close
 - flash_lights
 
+By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`.
+
 #### Example Request
 
 *(All requests with method POST.)*
 
 Start charging:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start`
+
+Start charging and wait for the command to complete:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start?wait=true`
 
 Stop charging:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/charge_stop`
