@@ -18,7 +18,7 @@ import (
 
 var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", 
 	"charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", 
-	"session_info", "honk_horn", "open_trunk", "close_trunk", "lock", "unlock"}
+	"session_info", "honk_horn", "open_trunk", "close_trunk", "lock", "unlock", "sentry_on", "sentry_off"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -66,6 +66,14 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	case "unlock":
 		if err := car.Unlock(ctx); err != nil {
 			return true, fmt.Errorf("failed to unlock %s", err)
+		}
+	case "sentry_on":
+		if err := car.SetSentryMode(ctx, true); err != nil {
+			return true, fmt.Errorf("failed to turn on sentry mode %s", err)
+		}
+	case "sentry_off":
+		if err := car.SetSentryMode(ctx, false); err != nil {
+			return true, fmt.Errorf("failed to turn off sentry mode %s", err)
 		}
 	case "charge_start":
 		if err := car.ChargeStart(ctx); err != nil {
