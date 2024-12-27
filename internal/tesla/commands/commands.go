@@ -51,29 +51,31 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.HonkHorn(ctx); err != nil {
 			return true, fmt.Errorf("failed to honk horn %s", err)
 		}
-	case "open_trunk":
+	// Fix this https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands#actuate-trunk
+	case "actuate_trunk":
 		if err := car.OpenTrunk(ctx); err != nil {
 			return true, fmt.Errorf("failed to open trunk %s", err)
 		}
-	case "close_trunk":
-		if err := car.CloseTrunk(ctx); err != nil {
-			return true, fmt.Errorf("failed to close trunk %s", err)
-		}
-	case "lock":
+	case "door_lock":
 		if err := car.Lock(ctx); err != nil {
 			return true, fmt.Errorf("failed to lock %s", err)
 		}
-	case "unlock":
+	case "door_unlock":
 		if err := car.Unlock(ctx); err != nil {
 			return true, fmt.Errorf("failed to unlock %s", err)
 		}
-	case "sentry_on":
-		if err := car.SetSentryMode(ctx, true); err != nil {
-			return true, fmt.Errorf("failed to turn on sentry mode %s", err)
+	case "set_sentry_mode":
+		var on bool
+		switch v := command.Body["on"].(type) {
+		case bool:
+			on = bool(v)
+		case string:
+			on = bool(v)
+		default:
+			return false, fmt.Errorf("on missing in body")
 		}
-	case "sentry_off":
-		if err := car.SetSentryMode(ctx, false); err != nil {
-			return true, fmt.Errorf("failed to turn off sentry mode %s", err)
+		if err := car.SetSentryMode(ctx, on); err != nil {
+			return true, fmt.Errorf("failed to set sentry mode %s", err)
 		}
 	case "charge_start":
 		if err := car.ChargeStart(ctx); err != nil {
