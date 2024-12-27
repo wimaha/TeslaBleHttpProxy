@@ -1,0 +1,89 @@
+name: Build, Assess Vulnerability, Push
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths-ignore:
+      - '**/README.md'
+  schedule:
+    - cron: '43 19 */7 * *'
+
+env:
+  IMAGE_NAME: tesla-ble-http-proxy
+
+jobs:  
+  AMD64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'fs'
+          format: 'github'
+          output: 'dependency-results.sbom.json'
+          image-ref: '.'
+          github-pat: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Attempt Build
+        run: docker build . --file Dockerfile -t $IMAGE_NAME
+        
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Log into Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push container image
+        id: push-step
+        uses: docker/build-push-action@master
+        with:
+          push: true
+          tags: ghcr.io/aneisch/${{ env.IMAGE_NAME }}:latest
+
+  Multiarch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+      
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      
+      - name: Log into Registry
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      
+      - name: Build and push
+        uses: docker/build-push-action@master
+        id: push-step
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/aneisch/${{ env.IMAGE_NAME }}:latest-arm64
+          platforms: linux/arm64/v8
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
