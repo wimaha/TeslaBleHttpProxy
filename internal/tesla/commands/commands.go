@@ -16,7 +16,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
+var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", 
+	"charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", 
+	"session_info", "honk_horn", "open_trunk", "close_trunk", "lock", "unlock"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -44,6 +46,26 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	case "wake_up":
 		if err := car.Wakeup(ctx); err != nil {
 			return true, fmt.Errorf("failed to wake up car: %s", err)
+		}
+	case "honk_horn":
+		if err := car.HonkHorn(ctx); err != nil {
+			return true, fmt.Errorf("failed to honk horn %s", err)
+		}
+	case "open_trunk":
+		if err := car.OpenTrunk(ctx); err != nil {
+			return true, fmt.Errorf("failed to open trunk %s", err)
+		}
+	case "close_trunk":
+		if err := car.CloseTrunk(ctx); err != nil {
+			return true, fmt.Errorf("failed to close trunk %s", err)
+		}
+	case "lock":
+		if err := car.Lock(ctx); err != nil {
+			return true, fmt.Errorf("failed to lock %s", err)
+		}
+	case "unlock":
+		if err := car.Unlock(ctx); err != nil {
+			return true, fmt.Errorf("failed to unlock %s", err)
 		}
 	case "charge_start":
 		if err := car.ChargeStart(ctx); err != nil {
