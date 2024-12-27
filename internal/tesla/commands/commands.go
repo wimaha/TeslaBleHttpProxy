@@ -70,7 +70,11 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		case bool:
 			on = bool(v)
 		case string:
-			on = bool(v)
+			if on, err := strconv.ParseBool(v); err == nil {
+				on = bool(v)
+			} else {
+				return false, fmt.Errorf("on parsing error: %s", err)
+			}
 		default:
 			return false, fmt.Errorf("on missing in body")
 		}
