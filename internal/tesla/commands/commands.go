@@ -18,7 +18,7 @@ import (
 
 var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", 
 	"charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", 
-	"session_info", "honk_horn", "actuate_trunk", "lock", "unlock", "set_sentry_mode"}
+	"session_info", "honk_horn", "lock", "unlock", "set_sentry_mode"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -50,11 +50,6 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	case "honk_horn":
 		if err := car.HonkHorn(ctx); err != nil {
 			return true, fmt.Errorf("failed to honk horn %s", err)
-		}
-	// Fix this https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-commands#actuate-trunk
-	case "actuate_trunk":
-		if err := car.OpenTrunk(ctx); err != nil {
-			return true, fmt.Errorf("failed to open trunk %s", err)
 		}
 	case "door_lock":
 		if err := car.Lock(ctx); err != nil {
