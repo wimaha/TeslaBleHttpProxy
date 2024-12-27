@@ -70,8 +70,8 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		case bool:
 			on = bool(v)
 		case string:
-			if on, err := strconv.ParseBool(v); err == nil {
-				on = bool(v)
+			if onBool, err := strconv.ParseBool(v); err == nil {
+				on = bool(onBool)
 			} else {
 				return false, fmt.Errorf("on parsing error: %s", err)
 			}
