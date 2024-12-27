@@ -18,7 +18,7 @@ import (
 
 var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", 
 	"charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", 
-	"session_info", "honk_horn", "lock", "unlock", "set_sentry_mode"}
+	"session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
