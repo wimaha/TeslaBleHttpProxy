@@ -158,8 +158,8 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - charge_port_door_close
 - flash_lights
 - honk_horn
-- lock
-- unlock
+- door_lock
+- door_unlock
 - set_sentry_mode
 
 By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`.
