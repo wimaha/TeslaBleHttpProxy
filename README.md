@@ -79,7 +79,7 @@ You can now close the dashboard and use the proxy. 🙂
 
 ## Setup EVCC
 
-If you want to use the solely TeslaBleHttpProxy, you can use the following configuration in evcc (recommended):
+If you want to use solely TeslaBleHttpProxy, you can use the following configuration in evcc (recommended):
 
 ```
 vehicles:
@@ -122,6 +122,16 @@ vehicles:
       jq: .response.response.charge_state.battery_range
       scale: 1.60934
       timeout: 30s
+    status:
+      source: http
+      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
+      method: GET
+      jq: (if (.response.response.charge_state.charging_state == "Charging") then "C"
+        elif (.response.response.charge_state.charging_state == "Stopped") then "B"
+        elif (.response.response.charge_state.charging_state == "NoPower") then "B"
+        elif (.response.response.charge_state.charging_state == "Complete") then "B" 
+        else "A" end)
+      timeout: 30s 
 ```
 
 If you want to use this proxy only for commands, and not for vehicle data, you can use the following configuration. The vehicle data is then fetched via the Tesla API by evcc.
