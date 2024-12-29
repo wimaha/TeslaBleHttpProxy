@@ -17,7 +17,7 @@ var static embed.FS
 var html embed.FS
 
 func main() {
-	log.Info("TeslaBleHttpProxy 2.0.0 is loading ...")
+	log.Info("TeslaBleHttpProxy 2.0.1 is loading ...")
 
 	config := config.LoadConfig()
 
