@@ -16,7 +16,9 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info"}
+var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", 
+	"charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", 
+	"session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -44,6 +46,35 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	case "wake_up":
 		if err := car.Wakeup(ctx); err != nil {
 			return true, fmt.Errorf("failed to wake up car: %s", err)
+		}
+	case "honk_horn":
+		if err := car.HonkHorn(ctx); err != nil {
+			return true, fmt.Errorf("failed to honk horn %s", err)
+		}
+	case "door_lock":
+		if err := car.Lock(ctx); err != nil {
+			return true, fmt.Errorf("failed to lock %s", err)
+		}
+	case "door_unlock":
+		if err := car.Unlock(ctx); err != nil {
+			return true, fmt.Errorf("failed to unlock %s", err)
+		}
+	case "set_sentry_mode":
+		var on bool
+		switch v := command.Body["on"].(type) {
+		case bool:
+			on = bool(v)
+		case string:
+			if onBool, err := strconv.ParseBool(v); err == nil {
+				on = bool(onBool)
+			} else {
+				return false, fmt.Errorf("on parsing error: %s", err)
+			}
+		default:
+			return false, fmt.Errorf("on missing in body")
+		}
+		if err := car.SetSentryMode(ctx, on); err != nil {
+			return true, fmt.Errorf("failed to set sentry mode %s", err)
 		}
 	case "charge_start":
 		if err := car.ChargeStart(ctx); err != nil {
