@@ -30,8 +30,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: |
-            wimaha/tesla-ble-http-proxy
+          images: wimaha/tesla-ble-http-proxy
 
       - name: Publish
         uses: docker/build-push-action@v6
@@ -40,4 +39,4 @@ jobs:
           platforms: linux/amd64,linux/arm64,linux/arm/v6,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          #tags: wimaha/tesla-ble-http-proxy:ga
+          
