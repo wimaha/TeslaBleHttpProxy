@@ -13,10 +13,12 @@ ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 ARG TARGETOS
 ARG TARGETARCH
+ARG TARGETVARIANT
+ARG GOARM=${TARGETVARIANT#v}
 
 #WORKDIR /app/
 #ADD . .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOARM=${GOARM} go build -ldflags="-w -s" -o /go/bin/teslaBleHttpProxy main.go
 RUN mkdir -p /go/bin/key
 
 FROM scratch
