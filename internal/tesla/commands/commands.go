@@ -16,9 +16,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", 
-	"charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", 
-	"session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
+var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -63,10 +61,10 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		var on bool
 		switch v := command.Body["on"].(type) {
 		case bool:
-			on = bool(v)
+			on = v
 		case string:
 			if onBool, err := strconv.ParseBool(v); err == nil {
-				on = bool(onBool)
+				on = onBool
 			} else {
 				return false, fmt.Errorf("on parsing error: %s", err)
 			}
@@ -168,12 +166,11 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			if err != nil {
 				return true, fmt.Errorf("failed to get vehicle data: %s", err)
 			}
-			d, err := protojson.Marshal(data)
+			/*d, err := protojson.Marshal(data)
 			if err != nil {
 				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
 			}
-
-			//log.Debugf("data: %s", d)
+			log.Debugf("data: %s", d)*/
 
 			var converted interface{}
 			switch endpoint {
@@ -182,7 +179,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			case "climate_state":
 				converted = models.ClimateStateFromBle(data)
 			}
-			d, err = json.Marshal(converted)
+			d, err := json.Marshal(converted)
 			if err != nil {
 				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
 			}
