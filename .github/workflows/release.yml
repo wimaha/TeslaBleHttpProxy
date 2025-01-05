@@ -31,7 +31,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            evcc/evcc
+            wimaha/tesla-ble-http-proxy
 
       - name: Publish
         uses: docker/build-push-action@v6
