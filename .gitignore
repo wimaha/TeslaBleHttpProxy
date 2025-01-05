@@ -28,3 +28,7 @@ key/*
 desc.md
 
 .DS_Store
+
+TeslaBleHttpProxy
+
+go/bin/

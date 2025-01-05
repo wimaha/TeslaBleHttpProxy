@@ -1,34 +1,41 @@
-.DEFAULT_GOAL := default
+# build vars
+TAG_NAME := $(shell test -d .git && git describe --abbrev=0 --tags)
+SHA := $(shell test -d .git && git rev-parse --short HEAD)
+VERSION := $(if $(TAG_NAME),$(TAG_NAME),$(SHA))
 
-IMAGE ?= wimaha/tesla-ble-http-proxy
-VERSION := 2.0.1
+LD_FLAGS := -X main.Version=$(VERSION) -s -w
+BUILD_ARGS := -ldflags='$(LD_FLAGS)'
+BUILD_DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
+
+# docker
+DOCKER_IMAGE := wimaha/tesla-ble-http-proxy
+DOCKER_TAG := dev
+PLATFORM := linux/amd64,linux/arm64,linux/arm/v6,linux/arm/v7
 
 export DOCKER_CLI_EXPERIMENTAL=enabled
 
-.PHONY: build # Build the container image
-build:
-	@docker buildx create --use --name=crossplat --node=crossplat && \
-	docker buildx build \
-		--output "type=docker,push=false" \
-		--tag $(IMAGE) \
-		.
+default:: build
 
-.PHONY: publish # Push the image to the remote registry
-publish:
-	@docker buildx create --use --name=crossplat --node=crossplat && \
-	docker buildx build \
-		--platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le \
-		--output "type=image,push=true" \
-		--tag $(IMAGE) \
-		--tag $(IMAGE):$(VERSION) \
-		--tag $(IMAGE):dev \
-		.
+lint::
+	golangci-lint run
 
-.PHONY: dev # Push the image to the remote registry
-dev:
-	@docker buildx create --use --name=crossplat --node=crossplat && \
-	docker buildx build \
-		--platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64,linux/ppc64le \
-		--output "type=image,push=true" \
-		--tag $(IMAGE):dev \
-		.
+build::
+	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
+	go build $(BUILD_ARGS)
+
+build-docker::
+	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
+	go build $(BUILD_ARGS) -o /go/bin/teslaBleHttpProxy main.go
+
+docker::
+	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
+	docker buildx build --tag $(DOCKER_IMAGE) --output "type=docker,push=false" . 
+#--progress=plain --no-cache 
+
+dev::
+	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
+	docker buildx build --platform $(PLATFORM) --tag $(DOCKER_IMAGE):$(DOCKER_TAG) --output "type=image,push=true" .
+
+publish::
+	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
+	docker buildx build --platform $(PLATFORM) --tag $(DOCKER_IMAGE) --tag $(DOCKER_IMAGE):$(VERSION) --tag $(DOCKER_IMAGE):$(DOCKER_TAG) --output "type=image,push=true" .
