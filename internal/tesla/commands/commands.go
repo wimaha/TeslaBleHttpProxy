@@ -153,7 +153,14 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			log.Info(fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", car.VIN()))
 		}
 	case "vehicle_data":
-		var endpoints = command.Body["endpoints"].([]string)
+		if command.Body == nil {
+			return false, fmt.Errorf("request body is nil")
+		}
+
+		endpoints, ok := command.Body["endpoints"].([]string)
+		if !ok {
+			return false, fmt.Errorf("missing or invalid 'endpoints' in request body")
+		}
 
 		response := make(map[string]json.RawMessage)
 		for _, endpoint := range endpoints {
@@ -202,6 +209,8 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
 		}
 		command.Response.Response = d
+	default:
+		return false, fmt.Errorf("unrecognized command: %s", command.Command)
 	}
 
 	// everything fine
