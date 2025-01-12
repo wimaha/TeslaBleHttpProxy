@@ -4,7 +4,7 @@ You can optionally set environment variables to override the default behavior.
 
 ## logLevel
 
-This is the log level. Options: debug, info, warn, error, fatal (Default: info)
+This is the log level. Options: debug (Default: info)
 
 ## cacheMaxAge
 
@@ -33,5 +33,5 @@ This will set the log level to debug, the cache max age to 30 seconds, and the H
 You can also set the environment variables in the command line when starting the program. Example:
 
 ```
-./TeslaBleHttpProxy -logLevel=debug -cacheMaxAge=30 -httpListenAddress=:5687
+logLevel=debug cacheMaxAge=30 httpListenAddress=:5687 ./TeslaBleHttpProxy
 ```
