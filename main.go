@@ -21,12 +21,12 @@ var Version = "*undefined*"
 func main() {
 	log.Infof("TeslaBleHttpProxy %s is loading ...", Version)
 
-	config := config.LoadConfig()
+	config.InitConfig()
 
 	control.SetupBleControl()
 
 	router := routes.SetupRoutes(static, html)
 
 	log.Info("TeslaBleHttpProxy is running!")
-	log.Fatal(http.ListenAndServe(config.HttpListenAddress, router))
+	log.Fatal(http.ListenAndServe(config.AppConfig.HttpListenAddress, router))
 }
