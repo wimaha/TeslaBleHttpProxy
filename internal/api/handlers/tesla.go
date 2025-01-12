@@ -12,6 +12,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/gorilla/mux"
+	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
@@ -140,6 +141,8 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	wg.Wait()
 
+	SetCacheControl(w, config.AppConfig.CacheMaxAge)
+
 	if apiResponse.Result {
 		response.Result = true
 		response.Reason = "The request was successfully processed."
@@ -189,6 +192,8 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		SetCacheControl(w, config.AppConfig.CacheMaxAge)
+
 		if apiResponse.Result {
 			response.Result = true
 			response.Reason = "The request was successfully processed."
@@ -200,5 +205,13 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 	} else {
 		response.Result = false
 		response.Reason = err.Error()
+	}
+}
+
+func SetCacheControl(w http.ResponseWriter, maxAge int) {
+	if maxAge > 0 {
+		w.Header().Set("Cache-Control", fmt.Sprintf("public, max-age=%d, must-revalidate", maxAge))
+	} else {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	}
 }
