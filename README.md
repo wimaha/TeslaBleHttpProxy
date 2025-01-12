@@ -29,6 +29,8 @@ services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy
     container_name: tesla-ble-http-proxy
+    environment:
+      - cacheMaxAge=30 # Optional, but recommended to set this to anything more than 0 if you are using the vehicle data
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus
@@ -43,6 +45,8 @@ services:
 Please remember to create an empty folder where the keys can be stored later. In this example, it is `~/TeslaBleHttpProxy/key`.
 
 Pull and start TeslaBleHttpProxy with `docker compose up -d`.
+
+Note that you can optionally set environment variables to override the default behavior. See [environment variables](docs/environment_variables.md) for more information.
 
 ### Build yourself
 
@@ -79,59 +83,18 @@ You can now close the dashboard and use the proxy. 🙂
 
 ## Setup EVCC
 
-If you want to use solely TeslaBleHttpProxy, you can use the following configuration in evcc (recommended):
+You can use the following configuration in evcc (recommended):
 
 ```
 vehicles:
   - name: tesla
-    type: custom
-    title: Your Tesla
-    icon: car
-    capacity: 60
-    chargeenable:
-      source: http
-      uri: "http://IP:8080/api/1/vehicles/VIN/command/{{if .chargeenable}}charge_start{{else}}charge_stop{{end}}"
-      method: POST
-      body: ""
-    maxcurrent: # set charger max current (A)
-      source: http
-      uri: http://IP:8080/api/1/vehicles/VIN/command/set_charging_amps
-      method: POST
-      body: '{"charging_amps": "{{.maxcurrent}}"}'
-    wakeup: # vehicle wake up command
-      source: http
-      uri: http://IP:8080/api/1/vehicles/VIN/command/wake_up
-      method: POST
-      body: ""
-    soc:
-      source: http
-      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
-      method: GET
-      jq: .response.response.charge_state.battery_level
-      timeout: 30s 
-    limitsoc:
-      source: http
-      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
-      method: GET
-      jq: .response.response.charge_state.charge_limit_soc
-      timeout: 30s
-    range:
-      source: http
-      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
-      method: GET
-      jq: .response.response.charge_state.battery_range
-      scale: 1.60934
-      timeout: 30s
-    status:
-      source: http
-      uri: http://IP:8080/api/1/vehicles/VIN/vehicle_data?endpoints=charge_state
-      method: GET
-      jq: (if (.response.response.charge_state.charging_state == "Charging") then "C"
-        elif (.response.response.charge_state.charging_state == "Stopped") then "B"
-        elif (.response.response.charge_state.charging_state == "NoPower") then "B"
-        elif (.response.response.charge_state.charging_state == "Complete") then "B" 
-        else "A" end)
-      timeout: 30s 
+    type: template
+    template: tesla-ble
+    title: Your Tesla (optional)
+    capacity: 60 # Akkukapazität in kWh (optional)
+    vin: VIN # Erforderlich für BLE-Verbindung
+    url: IP # URL des Tesla BLE HTTP Proxy
+    port: 8080 # Port des Tesla BLE HTTP Proxy (optional)
 ```
 
 If you want to use this proxy only for commands, and not for vehicle data, you can use the following configuration. The vehicle data is then fetched via the Tesla API by evcc.
