@@ -4,7 +4,7 @@ You can optionally set environment variables to override the default behavior.
 
 ## logLevel
 
-This is the log level. (Default: info)
+This is the log level. Options: debug, info, warn, error, fatal (Default: info)
 
 ## cacheMaxAge
 

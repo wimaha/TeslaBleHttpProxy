@@ -59,6 +59,8 @@ go build .
 
 Please remember to create an empty folder called `key` where the keys can be stored later.
 
+Note that you can optionally set environment variables to override the default behavior. See [environment variables](docs/environment_variables.md) for more information.
+
 ## Generate key for vehicle
 
 *(Here, the simple, automatic method is described. Besides the automatic method, you can also generate the keys [manually](docs/manually_gen_key.md).)*
