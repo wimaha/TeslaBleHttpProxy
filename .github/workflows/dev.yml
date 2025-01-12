@@ -1,4 +1,4 @@
-name: Release
+name: Dev
 
 env:
   GO_VERSION: ^1.23
