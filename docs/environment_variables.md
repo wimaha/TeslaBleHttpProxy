@@ -8,7 +8,7 @@ This is the log level. Options: debug, info, warn, error, fatal (Default: info)
 
 ## cacheMaxAge
 
-This is the number of seconds to cache the BLE responses. If set to 0, the cache is disabled. (Default: 0)
+This is the number of seconds to cache the BLE responses for vehicle data and body controller state. If set to 0, the cache is disabled. (Default: 0)
 
 ## httpListenAddress
 
