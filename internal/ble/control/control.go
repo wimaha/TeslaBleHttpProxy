@@ -113,8 +113,10 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			return commandError(parentCtx.Err())
 		}
 	} else {
+		if firstCommand.Response != nil {
+			log.Warn("no context provided, using default", "command", firstCommand.Command, "body", firstCommand.Body)
+		}
 		parentCtx = context.Background()
-		log.Warn("no context provided, using default", "command", firstCommand.Command, "body", firstCommand.Body)
 	}
 
 	for i := 0; i < retryCount; i++ {
@@ -285,7 +287,9 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 	if command.Response != nil && command.Response.Ctx != nil {
 		ctx = command.Response.Ctx
 	} else {
-		log.Debug("no context provided, using default", "command", command.Command, "body", command.Body)
+		if command.Response != nil {
+			log.Debug("no context provided, using default", "command", command.Command, "body", command.Body)
+		}
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
