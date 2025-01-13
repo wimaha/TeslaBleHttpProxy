@@ -61,8 +61,10 @@ func (bc *BleControl) Loop() {
 	for {
 		time.Sleep(1 * time.Second)
 		if retryCommand != nil {
+			log.Debug("retrying command from loop", "command", retryCommand.Command, "body", retryCommand.Body)
 			retryCommand = bc.connectToVehicleAndOperateConnection(retryCommand)
 		} else {
+			log.Debug("waiting for command")
 			// Wait for the next command
 			select {
 			case command, ok := <-bc.providerStack:
@@ -89,6 +91,7 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
 	log.Info("connecting to Vehicle ...")
+	defer log.Debug("connecting to Vehicle done")
 
 	var sleep = 3 * time.Second
 	var retryCount = 3
@@ -234,6 +237,8 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 }
 
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
+	log.Debug("operating connection ...")
+	defer log.Debug("operating connection done")
 	if firstCommand.Command != "wake_up" {
 		cmd, err := bc.ExecuteCommand(car, firstCommand)
 		if err != nil {
