@@ -192,7 +192,7 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 		defer car.Disconnect()
 		defer log.Debug("disconnect vehicle (A)")
 
-		_, err := control.BleControlInstance.ExecuteCommand(car, cmd)
+		_, err, _ := control.BleControlInstance.ExecuteCommand(car, cmd, context.Background())
 		if err != nil {
 			response.Result = false
 			response.Reason = err.Error()

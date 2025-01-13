@@ -239,17 +239,41 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
 	log.Debug("operating connection ...")
 	defer log.Debug("operating connection done")
+	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
+	defer cancel()
+
 	if firstCommand.Command != "wake_up" {
-		cmd, err := bc.ExecuteCommand(car, firstCommand)
+		cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
 		if err != nil {
 			return cmd
 		}
 	}
 
-	timeout := time.After(29 * time.Second)
+	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {
+		//If new VIN, close connection
+		if command.Vin != firstCommand.Vin {
+			log.Debug("new VIN, so close connection")
+			return true, command
+		}
+
+		cmd, err, ctx := bc.ExecuteCommand(car, command, connectionCtx)
+
+		// If the connection context is done, return to reoperate the connection
+		if connectionCtx.Err() != nil {
+			return true, cmd
+		}
+		// If the context is not done, return to retry the command
+		if err != nil && ctx.Err() == nil {
+			return true, cmd
+		}
+
+		// Successful or api context done so no retry
+		return false, nil
+	}
+
 	for {
 		select {
-		case <-timeout:
+		case <-connectionCtx.Done():
 			log.Debug("connection Timeout")
 			return nil
 		case command, ok := <-bc.providerStack:
@@ -257,38 +281,25 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 				return nil
 			}
 
-			//If new VIN, close connection
-			if command.Vin != firstCommand.Vin {
-				log.Debug("new VIN, so close connection")
-				return &command
-			}
-
-			cmd, err := bc.ExecuteCommand(car, &command)
-			if err != nil {
-				return cmd
+			doReturn, retryCommand := handleCommand(&command)
+			if doReturn {
+				return retryCommand
 			}
 		case command, ok := <-bc.commandStack:
 			if !ok {
 				return nil
 			}
 
-			//If new VIN, close connection
-			if command.Vin != firstCommand.Vin {
-				log.Debug("new VIN, so close connection")
-				return &command
-			}
-
-			cmd, err := bc.ExecuteCommand(car, &command)
-			if err != nil {
-				return cmd
+			doReturn, retryCommand := handleCommand(&command)
+			if doReturn {
+				return retryCommand
 			}
 		}
 	}
 }
 
-func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command) (retryCommand *commands.Command, retErr error) {
+func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command, connectionCtx context.Context) (retryCommand *commands.Command, retErr error, ctx context.Context) {
 	log.Info("sending", "command", command.Command, "body", command.Body)
-	var ctx context.Context
 	if command.Response != nil && command.Response.Ctx != nil {
 		ctx = command.Response.Ctx
 	} else {
@@ -318,11 +329,31 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		}
 	}()
 
+	// If the context is already done, return immediately
+	if ctx.Err() != nil {
+		return nil, ctx.Err(), ctx
+	}
+
+	// Wrap ctx with connectionCtx
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-connectionCtx.Done():
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
 			log.Warn(lastErr)
 			log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
-			time.Sleep(sleep)
+			select {
+			case <-time.After(sleep):
+			case <-ctx.Done():
+				return nil, ctx.Err(), ctx
+			}
 			sleep *= 2
 		}
 
@@ -330,18 +361,18 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		if err == nil {
 			//Successful
 			log.Info("successfully executed", "command", command.Command, "body", command.Body)
-			return nil, nil
+			return nil, nil, ctx
 		} else if !retry {
-			return nil, nil
+			return nil, nil, ctx
 		} else {
 			//closed pipe
 			if strings.Contains(err.Error(), "closed pipe") {
 				//connection lost, returning the command so it can be executed again
-				return command, err
+				return command, err, ctx
 			}
 			lastErr = err
 		}
 	}
 	log.Error("canceled", "command", command.Command, "body", command.Body, "err", lastErr)
-	return nil, lastErr
+	return nil, lastErr, ctx
 }
