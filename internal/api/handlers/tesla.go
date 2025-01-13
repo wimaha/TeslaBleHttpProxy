@@ -44,6 +44,7 @@ func checkBleControl(response *models.Response) bool {
 }
 
 func Command(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "Command")
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := params["command"]
@@ -102,6 +103,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 }
 
 func VehicleData(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "VehicleData")
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := "vehicle_data"
@@ -155,6 +157,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 }
 
 func BodyControllerState(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "BodyControllerState")
 	params := mux.Vars(r)
 	vin := params["vin"]
 
