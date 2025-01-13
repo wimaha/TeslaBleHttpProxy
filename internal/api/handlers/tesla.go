@@ -80,6 +80,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		var apiResponse models.ApiResponse
 		wg := sync.WaitGroup{}
 		apiResponse.Wait = &wg
+		apiResponse.Ctx = r.Context()
 
 		wg.Add(1)
 		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse)
@@ -138,6 +139,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	var apiResponse models.ApiResponse
 	wg := sync.WaitGroup{}
 	apiResponse.Wait = &wg
+	apiResponse.Ctx = r.Context()
 
 	wg.Add(1)
 	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
@@ -173,7 +175,8 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 
 	var apiResponse models.ApiResponse
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	apiResponse.Ctx = ctx
 	defer cancel()
 	cmd := &commands.Command{
 		Command:  "body-controller-state",

@@ -94,15 +94,42 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 	var retryCount = 3
 	var lastErr error
 
+	commandError := func(err error) *commands.Command {
+		log.Error("can't connect to vehicle", "error", err)
+		if firstCommand.Response != nil {
+			firstCommand.Response.Error = err.Error()
+			firstCommand.Response.Result = false
+			if firstCommand.Response.Wait != nil {
+				firstCommand.Response.Wait.Done()
+			}
+		}
+		return nil
+	}
+
+	var parentCtx context.Context
+	if firstCommand.Response != nil && firstCommand.Response.Ctx != nil {
+		parentCtx = firstCommand.Response.Ctx
+		if parentCtx.Err() != nil {
+			return commandError(parentCtx.Err())
+		}
+	} else {
+		parentCtx = context.Background()
+		log.Warn("no context provided, using default", "command", firstCommand.Command, "body", firstCommand.Body)
+	}
+
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
 			log.Warn(lastErr)
 			log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
-			time.Sleep(sleep)
+			select {
+			case <-time.After(sleep):
+			case <-parentCtx.Done():
+				return commandError(parentCtx.Err())
+			}
 			sleep *= 2
 		}
 		log.Debug("trying connecting to vehicle", "attempt", i+1)
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
 		defer cancel()
 		conn, car, retry, err := bc.TryConnectToVehicle(ctx, firstCommand)
 		if err == nil {
@@ -113,30 +140,15 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			defer log.Debug("disconnect vehicle (A)")
 			cmd := bc.operateConnection(car, firstCommand)
 			return cmd
-		} else if !retry {
+		} else if !retry || parentCtx.Err() != nil {
 			//Failed but no retry possible
-			log.Error("can't connect to vehicle", "error", err)
-			if firstCommand.Response != nil {
-				firstCommand.Response.Error = err.Error()
-				firstCommand.Response.Result = false
-				if firstCommand.Response.Wait != nil {
-					firstCommand.Response.Wait.Done()
-				}
-			}
-			return nil
+			return commandError(err)
 		} else {
 			lastErr = err
 		}
 	}
 	log.Error(fmt.Sprintf("stop retrying after %d attempts", retryCount), "error", lastErr)
-	if firstCommand.Response != nil {
-		firstCommand.Response.Error = lastErr.Error()
-		firstCommand.Response.Result = false
-		if firstCommand.Response.Wait != nil {
-			firstCommand.Response.Wait.Done()
-		}
-	}
-	return nil
+	return commandError(lastErr)
 }
 
 func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *commands.Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
@@ -269,8 +281,15 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 
 func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command) (retryCommand *commands.Command, retErr error) {
 	log.Info("sending", "command", command.Command, "body", command.Body)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	var ctx context.Context
+	if command.Response != nil && command.Response.Ctx != nil {
+		ctx = command.Response.Ctx
+	} else {
+		log.Debug("no context provided, using default", "command", command.Command, "body", command.Body)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+	}
 
 	var sleep = 3 * time.Second
 	var retryCount = 3
