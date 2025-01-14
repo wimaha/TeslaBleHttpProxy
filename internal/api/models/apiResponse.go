@@ -1,6 +1,7 @@
 package models
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 )
@@ -10,4 +11,5 @@ type ApiResponse struct {
 	Result   bool
 	Error    string
 	Response json.RawMessage
+	Ctx      context.Context
 }

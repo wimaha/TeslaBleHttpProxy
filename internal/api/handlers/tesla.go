@@ -23,14 +23,15 @@ func commonDefer(w http.ResponseWriter, response *models.Response) {
 	ret.Response = *response
 
 	w.Header().Set("Content-Type", "application/json")
-	if response.Result {
-		w.WriteHeader(http.StatusOK)
-	} else {
-		w.WriteHeader(http.StatusServiceUnavailable)
+	status := http.StatusOK
+	if !response.Result {
+		status = http.StatusServiceUnavailable
 	}
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(ret); err != nil {
 		log.Fatal("failed to send response", "error", err)
 	}
+	log.Debug("response", "command", response.Command, "status", status, "result", response.Result, "reason", response.Reason)
 }
 
 func checkBleControl(response *models.Response) bool {
@@ -43,6 +44,7 @@ func checkBleControl(response *models.Response) bool {
 }
 
 func Command(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "Command")
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := params["command"]
@@ -78,6 +80,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		var apiResponse models.ApiResponse
 		wg := sync.WaitGroup{}
 		apiResponse.Wait = &wg
+		apiResponse.Ctx = r.Context()
 
 		wg.Add(1)
 		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse)
@@ -101,6 +104,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 }
 
 func VehicleData(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "VehicleData")
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := "vehicle_data"
@@ -135,6 +139,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	var apiResponse models.ApiResponse
 	wg := sync.WaitGroup{}
 	apiResponse.Wait = &wg
+	apiResponse.Ctx = r.Context()
 
 	wg.Add(1)
 	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
@@ -154,6 +159,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 }
 
 func BodyControllerState(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "BodyControllerState")
 	params := mux.Vars(r)
 	vin := params["vin"]
 
@@ -169,7 +175,8 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 
 	var apiResponse models.ApiResponse
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	apiResponse.Ctx = ctx
 	defer cancel()
 	cmd := &commands.Command{
 		Command:  "body-controller-state",
@@ -185,7 +192,7 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 		defer car.Disconnect()
 		defer log.Debug("disconnect vehicle (A)")
 
-		_, err := control.BleControlInstance.ExecuteCommand(car, cmd)
+		_, err, _ := control.BleControlInstance.ExecuteCommand(car, cmd, context.Background())
 		if err != nil {
 			response.Result = false
 			response.Reason = err.Error()
@@ -206,6 +213,10 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 		response.Result = false
 		response.Reason = err.Error()
 	}
+}
+
+func ShowRequest(r *http.Request, handler string) {
+	log.Debug("received", "handler", handler, "method", r.Method, "url", r.URL, "from", r.RemoteAddr)
 }
 
 func SetCacheControl(w http.ResponseWriter, maxAge int) {
