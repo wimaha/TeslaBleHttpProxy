@@ -2,7 +2,9 @@ package control
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -34,7 +36,8 @@ func CloseBleControl() {
 }
 
 type BleControl struct {
-	privateKey protocol.ECDHPrivateKey
+	privateKey     protocol.ECDHPrivateKey
+	operatedBeacon *ble.Advertisement
 
 	commandStack  chan commands.Command
 	providerStack chan commands.Command
@@ -89,7 +92,84 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 	}
 }
 
+func processIfConnectionStatusCommand(command *commands.Command, operated bool) bool {
+	if command.Command != "connection_status" {
+		return false
+	}
+
+	defer func() {
+		if command.Response.Wait != nil {
+			command.Response.Wait.Done()
+		}
+	}()
+
+	if BleControlInstance == nil {
+		command.Response.Error = "BleControl is not initialized. Maybe private.pem is missing."
+		command.Response.Result = false
+		return true
+	} else {
+		command.Response.Result = true
+	}
+
+	var beacon ble.Advertisement = nil
+
+	if operated {
+		if BleControlInstance.operatedBeacon != nil {
+			beacon = *BleControlInstance.operatedBeacon
+		} else {
+			log.Warn("operated beacon is nil but operated is true")
+		}
+	} else {
+		var err error
+		scanTimeout := config.AppConfig.ScanTimeout
+		scanCtx, cancelScan := context.WithCancel(command.Response.Ctx)
+		if scanTimeout > 0 {
+			scanCtx, cancelScan = context.WithTimeout(command.Response.Ctx, time.Duration(scanTimeout)*time.Second)
+		}
+		defer cancelScan()
+		beacon, err = ble.ScanVehicleBeacon(scanCtx, command.Vin)
+		if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
+			command.Response.Error = err.Error()
+			command.Response.Result = false
+			return true
+		}
+	}
+
+	var resp map[string]interface{}
+	if beacon != nil {
+		resp = map[string]interface{}{
+			"local_name":  beacon.LocalName(),
+			"connectable": beacon.Connectable(),
+			"address":     beacon.Addr().String(),
+			"rssi":        beacon.RSSI(),
+			"operated":    operated,
+		}
+	} else {
+		resp = map[string]interface{}{
+			"local_name":  ble.VehicleLocalName(command.Vin),
+			"connectable": false,
+			"address":     "",
+			"rssi":        math.MinInt32,
+			"operated":    false,
+		}
+	}
+	respBytes, err := json.Marshal(resp)
+
+	if err != nil {
+		command.Response.Error = err.Error()
+		command.Response.Result = false
+	} else {
+		command.Response.Response = json.RawMessage(respBytes)
+	}
+
+	return true
+}
+
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
+	if processIfConnectionStatusCommand(firstCommand, false) {
+		return nil
+	}
+
 	log.Info("connecting to Vehicle ...")
 	defer log.Debug("connecting to Vehicle done")
 
@@ -251,6 +331,8 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		log.Info("Key-Request connection established")
 	}
 
+	bc.operatedBeacon = &beacon
+
 	// everything fine
 	shouldDefer = false
 	return conn, car, false, nil
@@ -262,6 +344,8 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
 	defer cancel()
 
+	defer func() { bc.operatedBeacon = nil }()
+
 	if firstCommand.Command != "wake_up" {
 		cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
 		if err != nil {
@@ -270,6 +354,10 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	}
 
 	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {
+		if processIfConnectionStatusCommand(command, command.Vin == firstCommand.Vin) {
+			return false, nil
+		}
+
 		//If new VIN, close connection
 		if command.Vin != firstCommand.Vin {
 			log.Debug("new VIN, so close connection")

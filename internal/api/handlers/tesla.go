@@ -215,6 +215,44 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func BleConnectionStatus(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "BleConnectionStatus")
+	params := mux.Vars(r)
+	vin := params["vin"]
+	command := "connection_status"
+
+	var response models.Response
+	response.Vin = vin
+	response.Command = command
+
+	defer commonDefer(w, &response)
+
+	if !checkBleControl(&response) {
+		return
+	}
+
+	var apiResponse models.ApiResponse
+	wg := sync.WaitGroup{}
+	apiResponse.Wait = &wg
+	apiResponse.Ctx = r.Context()
+
+	wg.Add(1)
+	control.BleControlInstance.PushCommand(command, vin, nil, &apiResponse)
+
+	wg.Wait()
+
+	SetCacheControl(w, config.AppConfig.CacheMaxAge)
+
+	if apiResponse.Result {
+		response.Result = true
+		response.Reason = "The request was successfully processed."
+		response.Response = apiResponse.Response
+	} else {
+		response.Result = false
+		response.Reason = apiResponse.Error
+	}
+}
+
 func ShowRequest(r *http.Request, handler string) {
 	log.Debug("received", "handler", handler, "method", r.Method, "url", r.URL, "from", r.RemoteAddr)
 }
