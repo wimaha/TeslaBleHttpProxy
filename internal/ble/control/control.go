@@ -176,15 +176,35 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	}()
 
 	var err error
-	conn, err = ble.NewConnection(ctx, firstCommand.Vin)
+	log.Debug("scan for vehicle ...")
+	// Vehicle sends a beacon every ~200ms, so if it is not found in (scanTimeout=1) seconds,
+	// it is likely not in range and not worth retrying.
+	scanTimeout := config.AppConfig.ScanTimeout
+	scanCtx, cancelScan := context.WithCancel(ctx)
+	if scanTimeout > 0 {
+		scanCtx, cancelScan = context.WithTimeout(ctx, time.Duration(scanTimeout)*time.Second)
+	}
+	defer cancelScan()
+
+	beacon, err := ble.ScanVehicleBeacon(scanCtx, firstCommand.Vin)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
 			// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
 			// heavy-handed way of dealing with devices that are in a bad state.
-			return nil, nil, false, fmt.Errorf("failed to connect to vehicle (A): %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
+			return nil, nil, false, fmt.Errorf("failed to scan for vehicle: %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
+		} else if scanCtx.Err() != nil {
+			return nil, nil, false, fmt.Errorf("vehicle not in range: %s", err)
 		} else {
-			return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
+			return nil, nil, true, fmt.Errorf("failed to scan for vehicle: %s", err)
 		}
+	}
+
+	log.Debug("beacon found", "localName", beacon.LocalName(), "addr", beacon.Addr(), "rssi", beacon.RSSI())
+
+	log.Debug("dialing to vehicle ...")
+	conn, err = ble.NewConnectionToBleTarget(ctx, firstCommand.Vin, beacon)
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 	}
 	//defer conn.Close()
 
