@@ -15,7 +15,6 @@ import (
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
-	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
@@ -36,8 +35,9 @@ func CloseBleControl() {
 }
 
 type BleControl struct {
-	privateKey     protocol.ECDHPrivateKey
-	operatedBeacon *ble.Advertisement
+	privateKey          protocol.ECDHPrivateKey
+	operatedBeacon      *ble.Advertisement
+	infotainmentSession bool
 
 	commandStack  chan commands.Command
 	providerStack chan commands.Command
@@ -83,13 +83,8 @@ func (bc *BleControl) Loop() {
 	}
 }
 
-func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse) {
-	bc.commandStack <- commands.Command{
-		Command:  command,
-		Vin:      vin,
-		Body:     body,
-		Response: response,
-	}
+func (bc *BleControl) PushCommand(command commands.Command) {
+	bc.commandStack <- command
 }
 
 func processIfConnectionStatusCommand(command *commands.Command, operated bool) bool {
@@ -236,6 +231,20 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 	return commandError(lastErr)
 }
 
+func (bc *BleControl) startInfotainmentSession(ctx context.Context, car *vehicle.Vehicle) error {
+	log.Debug("start Infotainment session...")
+	// Then we can also connect the infotainment
+	if err := car.StartSession(ctx, []universalmessage.Domain{
+		protocol.DomainVCSEC,
+		protocol.DomainInfotainment,
+	}); err != nil {
+		return fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+	}
+	log.Info("connection established")
+	bc.infotainmentSession = true
+	return nil
+}
+
 func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *commands.Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
 	log.Debug("connecting to vehicle (A)...")
 	var conn *ble.Connection
@@ -286,6 +295,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 	}
+	bc.infotainmentSession = false
 	//defer conn.Close()
 
 	log.Debug("create vehicle object ...")
@@ -310,22 +320,16 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
 		}
 
-		if firstCommand.Domain != commands.Domain.VCSEC {
+		if firstCommand.Domain() != commands.Domain.VCSEC {
 			if err := car.Wakeup(ctx); err != nil {
 				return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 			} else {
 				log.Debug("car successfully wakeup")
 			}
 
-			log.Debug("start Infotainment session...")
-			// Then we can also connect the infotainment
-			if err := car.StartSession(ctx, []universalmessage.Domain{
-				protocol.DomainVCSEC,
-				protocol.DomainInfotainment,
-			}); err != nil {
-				return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+			if err := bc.startInfotainmentSession(ctx, car); err != nil {
+				return nil, nil, true, err
 			}
-			log.Info("connection established")
 		}
 	} else {
 		log.Info("Key-Request connection established")
@@ -341,17 +345,10 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
 	log.Debug("operating connection ...")
 	defer log.Debug("operating connection done")
-	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
+	connectionCtx, cancel := context.WithTimeout(context.Background(), 290*time.Second)
 	defer cancel()
 
 	defer func() { bc.operatedBeacon = nil }()
-
-	if firstCommand.Command != "wake_up" {
-		cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
-		if err != nil {
-			return cmd
-		}
-	}
 
 	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {
 		if processIfConnectionStatusCommand(command, command.Vin == firstCommand.Vin) {
@@ -377,6 +374,11 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 
 		// Successful or api context done so no retry
 		return false, nil
+	}
+
+	doReturn, retryCommand := handleCommand(firstCommand)
+	if doReturn {
+		return retryCommand
 	}
 
 	for {
@@ -407,7 +409,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 }
 
 func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command, connectionCtx context.Context) (retryCommand *commands.Command, retErr error, ctx context.Context) {
-	log.Info("sending", "command", command.Command, "body", command.Body)
+	log.Debug("sending", "command", command.Command, "body", command.Body)
 	if command.Response != nil && command.Response.Ctx != nil {
 		ctx = command.Response.Ctx
 	} else {
@@ -463,6 +465,20 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 				return nil, ctx.Err(), ctx
 			}
 			sleep *= 2
+		}
+
+		if !bc.infotainmentSession && command.Domain() == commands.Domain.Infotainment {
+			if err := car.Wakeup(ctx); err != nil {
+				lastErr = fmt.Errorf("failed to wake up car: %s", err)
+				continue
+			} else {
+				log.Debug("car successfully wakeup")
+			}
+
+			if err := bc.startInfotainmentSession(ctx, car); err != nil {
+				lastErr = err
+				continue
+			}
 		}
 
 		retry, err := command.Send(ctx, car)

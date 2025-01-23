@@ -20,27 +20,59 @@ var Domain = struct {
 	Infotainment: "infotainment",
 }
 
+type CommandSourceType string
+
+var CommandSource = struct {
+	FleetVehicleCommands CommandSourceType
+	FleetVehicleEndpoint CommandSourceType
+	TeslaBleHttpProxy    CommandSourceType
+}{
+	FleetVehicleCommands: "cmd",
+	FleetVehicleEndpoint: "end",
+	TeslaBleHttpProxy:    "proxy",
+}
+
 type Command struct {
 	Command  string
-	Domain   DomainType
+	Source   CommandSourceType
 	Vin      string
 	Body     map[string]interface{}
 	Response *models.ApiResponse
 }
 
-// 'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
 var categoriesByName = map[string]vehicle.StateCategory{
-	"charge_state":          vehicle.StateCategoryCharge,
-	"climate_state":         vehicle.StateCategoryClimate,
-	"drive":                 vehicle.StateCategoryDrive,
-	"closures_state":        vehicle.StateCategoryClosures,
-	"charge-schedule":       vehicle.StateCategoryChargeSchedule,
-	"precondition-schedule": vehicle.StateCategoryPreconditioningSchedule,
-	"tire-pressure":         vehicle.StateCategoryTirePressure,
-	"media":                 vehicle.StateCategoryMedia,
-	"media-detail":          vehicle.StateCategoryMediaDetail,
-	"software-update":       vehicle.StateCategorySoftwareUpdate,
-	"parental-controls":     vehicle.StateCategoryParentalControls,
+	"charge_state":  vehicle.StateCategoryCharge,
+	"climate_state": vehicle.StateCategoryClimate,
+	// "drive_state":                   vehicle.StateCategoryDrive,
+	// "location_data":                 vehicle.StateCategoryLocation,
+	// "closures_state":                vehicle.StateCategoryClosures,
+	// "charge_schedule_data":          vehicle.StateCategoryChargeSchedule,
+	// "preconditioning_schedule_data": vehicle.StateCategoryPreconditioningSchedule,
+
+	// Missing standard categories
+	// "gui_settings"
+	// "vehicle_config"
+	// "vehicle_state"
+	// "vehicle_data_combo"
+
+	// Non-standard categories
+	// "tire_pressure":     vehicle.StateCategoryTirePressure,
+	// "media":             vehicle.StateCategoryMedia,
+	// "media_detail":      vehicle.StateCategoryMediaDetail,
+	// "software_update":   vehicle.StateCategorySoftwareUpdate,
+	// "parental_controls": vehicle.StateCategoryParentalControls,
+}
+
+func (command *Command) Domain() DomainType {
+	switch command.Command {
+	case "body_controller_state":
+		fallthrough
+	case "wake_up":
+		return Domain.VCSEC
+	default:
+		return Domain.Infotainment
+	}
+
 }
 
 func GetCategory(nameStr string) (vehicle.StateCategory, error) {

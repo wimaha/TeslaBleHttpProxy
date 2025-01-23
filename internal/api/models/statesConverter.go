@@ -4,63 +4,94 @@ import (
 	"strings"
 
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/carserver"
+	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 )
 
-func flatten(s string) string {
+func flatten(s string) any {
+	if s == "<nil>" {
+		return nil
+	}
 	return strings.ReplaceAll(s, ":{}", "")
 }
 
-func ChargeStateFromBle(VehicleData *carserver.VehicleData) ChargeState {
-	return ChargeState{
-		Timestamp:                      VehicleData.ChargeState.GetTimestamp().AsTime().Unix(),
-		ChargingState:                  flatten(VehicleData.ChargeState.GetChargingState().String()),
-		ChargeLimitSoc:                 VehicleData.ChargeState.GetChargeLimitSoc(),
-		ChargeLimitSocStd:              VehicleData.ChargeState.GetChargeLimitSocStd(),
-		ChargeLimitSocMin:              VehicleData.ChargeState.GetChargeLimitSocMin(),
-		ChargeLimitSocMax:              VehicleData.ChargeState.GetChargeLimitSocMax(),
-		MaxRangeChargeCounter:          VehicleData.ChargeState.GetMaxRangeChargeCounter(),
-		FastChargerPresent:             VehicleData.ChargeState.GetFastChargerPresent(),
-		FastChargerType:                flatten(VehicleData.ChargeState.GetFastChargerType().String()),
-		BatteryRange:                   VehicleData.ChargeState.GetBatteryRange(),
-		EstBatteryRange:                VehicleData.ChargeState.GetEstBatteryRange(),
-		IdealBatteryRange:              VehicleData.ChargeState.GetIdealBatteryRange(),
-		BatteryLevel:                   VehicleData.ChargeState.GetBatteryLevel(),
-		UsableBatteryLevel:             VehicleData.ChargeState.GetUsableBatteryLevel(),
-		ChargeEnergyAdded:              VehicleData.ChargeState.GetChargeEnergyAdded(),
-		ChargeMilesAddedRated:          VehicleData.ChargeState.GetChargeMilesAddedRated(),
-		ChargeMilesAddedIdeal:          VehicleData.ChargeState.GetChargeMilesAddedIdeal(),
-		ChargerVoltage:                 VehicleData.ChargeState.GetChargerVoltage(),
-		ChargerPilotCurrent:            VehicleData.ChargeState.GetChargerPilotCurrent(),
-		ChargerActualCurrent:           VehicleData.ChargeState.GetChargerActualCurrent(),
-		ChargerPower:                   VehicleData.ChargeState.GetChargerPower(),
-		TripCharging:                   VehicleData.ChargeState.GetTripCharging(),
-		ChargeRate:                     VehicleData.ChargeState.GetChargeRateMphFloat(),
-		ChargePortDoorOpen:             VehicleData.ChargeState.GetChargePortDoorOpen(),
-		ScheduledChargingMode:          flatten(VehicleData.ChargeState.GetScheduledChargingMode().String()),
-		ScheduledDepatureTime:          VehicleData.ChargeState.GetScheduledDepartureTime().AsTime().Unix(),
-		ScheduledDepatureTimeMinutes:   VehicleData.ChargeState.GetScheduledDepartureTimeMinutes(),
-		SuperchargerSessionTripPlanner: VehicleData.ChargeState.GetSuperchargerSessionTripPlanner(),
-		ScheduledChargingStartTime:     VehicleData.ChargeState.GetScheduledChargingStartTime(),
-		ScheduledChargingPending:       VehicleData.ChargeState.GetScheduledChargingPending(),
-		UserChargeEnableRequest:        VehicleData.ChargeState.GetUserChargeEnableRequest(),
-		ChargeEnableRequest:            VehicleData.ChargeState.GetChargeEnableRequest(),
-		ChargerPhases:                  VehicleData.ChargeState.GetChargerPhases(),
-		ChargePortLatch:                flatten(VehicleData.ChargeState.GetChargePortLatch().String()),
-		ChargeCurrentRequest:           VehicleData.ChargeState.GetChargeCurrentRequest(),
-		ChargeCurrentRequestMax:        VehicleData.ChargeState.GetChargeCurrentRequestMax(),
-		ChargeAmps:                     VehicleData.ChargeState.GetChargingAmps(),
-		OffPeakChargingTimes:           flatten(VehicleData.ChargeState.GetOffPeakChargingTimes().String()),
-		OffPeakHoursEndTime:            VehicleData.ChargeState.GetOffPeakHoursEndTime(),
-		PreconditioningEnabled:         VehicleData.ChargeState.GetPreconditioningEnabled(),
-		PreconditioningTimes:           flatten(VehicleData.ChargeState.GetPreconditioningTimes().String()),
-		ManagedChargingActive:          VehicleData.ChargeState.GetManagedChargingActive(),
-		ManagedChargingUserCanceled:    VehicleData.ChargeState.GetManagedChargingUserCanceled(),
-		ManagedChargingStartTime:       VehicleData.ChargeState.GetManagedChargingStartTime(),
-		ChargePortcoldWeatherMode:      VehicleData.ChargeState.GetChargePortColdWeatherMode(),
-		ChargePortColor:                flatten(VehicleData.ChargeState.GetChargePortColor().String()),
-		ConnChargeCable:                flatten(VehicleData.ChargeState.GetConnChargeCable().String()),
-		FastChargerBrand:               flatten(VehicleData.ChargeState.GetFastChargerBrand().String()),
-		MinutesToFullCharge:            VehicleData.ChargeState.GetMinutesToFullCharge(),
+func BodyControllerStateFromBle(vehicleData *vcsec.VehicleStatus) map[string]interface{} {
+	cs := &vehicleData.ClosureStatuses
+	dcs := &vehicleData.DetailedClosureStatus
+	return map[string]interface{}{
+		"closure_statuses": map[string]interface{}{
+			"front_driver_door":    flatten((*cs).GetFrontDriverDoor().String()),
+			"front_passenger_door": flatten((*cs).GetFrontPassengerDoor().String()),
+			"rear_driver_door":     flatten((*cs).GetRearDriverDoor().String()),
+			"rear_passenger_door":  flatten((*cs).GetRearPassengerDoor().String()),
+			"rear_trunk":           flatten((*cs).GetRearTrunk().String()),
+			"front_trunk":          flatten((*cs).GetFrontTrunk().String()),
+			"charge_port":          flatten((*cs).GetChargePort().String()),
+			"tonneau":              flatten((*cs).GetTonneau().String()),
+		},
+		"detailed_closure_status": map[string]interface{}{
+			"tonneau_percent_open": (*dcs).GetTonneauPercentOpen(),
+		},
+		"user_presence":        flatten(vehicleData.GetUserPresence().String()),
+		"vehicle_lock_state":   flatten(vehicleData.GetVehicleLockState().String()),
+		"vehicle_sleep_status": flatten(vehicleData.GetVehicleSleepStatus().String()),
+	}
+}
+
+func ChargeStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	cs := vehicleData.ChargeState
+	return map[string]interface{}{
+		"timestamp":                         (*cs).GetTimestamp().AsTime().Unix(),
+		"charging_state":                    flatten((*cs).GetChargingState().String()),
+		"charge_limit_soc":                  (*cs).GetChargeLimitSoc(),
+		"charge_limit_soc_std":              (*cs).GetChargeLimitSocStd(),
+		"charge_limit_soc_min":              (*cs).GetChargeLimitSocMin(),
+		"charge_limit_soc_max":              (*cs).GetChargeLimitSocMax(),
+		"max_range_charge_counter":          (*cs).GetMaxRangeChargeCounter(),
+		"fast_charger_present":              (*cs).GetFastChargerPresent(),
+		"fast_charger_type":                 flatten((*cs).GetFastChargerType().String()),
+		"battery_range":                     (*cs).GetBatteryRange(),
+		"est_battery_range":                 (*cs).GetEstBatteryRange(),
+		"ideal_battery_range":               (*cs).GetIdealBatteryRange(),
+		"battery_level":                     (*cs).GetBatteryLevel(),
+		"usable_battery_level":              (*cs).GetUsableBatteryLevel(),
+		"charge_energy_added":               (*cs).GetChargeEnergyAdded(),
+		"charge_miles_added_rated":          (*cs).GetChargeMilesAddedRated(),
+		"charge_miles_added_ideal":          (*cs).GetChargeMilesAddedIdeal(),
+		"charger_voltage":                   (*cs).GetChargerVoltage(),
+		"charger_pilot_current":             (*cs).GetChargerPilotCurrent(),
+		"charger_actual_current":            (*cs).GetChargerActualCurrent(),
+		"charger_power":                     (*cs).GetChargerPower(),
+		"trip_charging":                     (*cs).GetTripCharging(),
+		"charge_rate":                       (*cs).GetChargeRateMphFloat(),
+		"charge_port_door_open":             (*cs).GetChargePortDoorOpen(),
+		"scheduled_charging_mode":           flatten((*cs).GetScheduledChargingMode().String()),
+		"scheduled_departure_time":          (*cs).GetScheduledDepartureTime().AsTime().Unix(),
+		"scheduled_departure_time_minutes":  (*cs).GetScheduledDepartureTimeMinutes(),
+		"supercharger_session_trip_planner": (*cs).GetSuperchargerSessionTripPlanner(),
+		"scheduled_charging_start_time":     (*cs).GetScheduledChargingStartTime(),
+		"scheduled_charging_pending":        (*cs).GetScheduledChargingPending(),
+		"user_charge_enable_request":        (*cs).GetUserChargeEnableRequest(),
+		"charge_enable_request":             (*cs).GetChargeEnableRequest(),
+		"charger_phases":                    (*cs).GetChargerPhases(),
+		"charge_port_latch":                 flatten((*cs).GetChargePortLatch().String()),
+		"charge_current_request":            (*cs).GetChargeCurrentRequest(),
+		"charge_current_request_max":        (*cs).GetChargeCurrentRequestMax(),
+		"charge_amps":                       (*cs).GetChargingAmps(),
+		"off_peak_charging_times":           flatten((*cs).GetOffPeakChargingTimes().String()),
+		"off_peak_hours_end_time":           (*cs).GetOffPeakHoursEndTime(),
+		"preconditioning_enabled":           (*cs).GetPreconditioningEnabled(),
+		"preconditioning_times":             flatten((*cs).GetPreconditioningTimes().String()),
+		"managed_charging_active":           (*cs).GetManagedChargingActive(),
+		"managed_charging_user_canceled":    (*cs).GetManagedChargingUserCanceled(),
+		"managed_charging_start_time":       (*cs).GetManagedChargingStartTime(),
+		"charge_port_cold_weather_mode":     (*cs).GetChargePortColdWeatherMode(),
+		"charge_port_color":                 flatten((*cs).GetChargePortColor().String()),
+		"conn_charge_cable":                 flatten((*cs).GetConnChargeCable().String()),
+		"fast_charger_brand":                flatten((*cs).GetFastChargerBrand().String()),
+		"minutes_to_full_charge":            (*cs).GetMinutesToFullCharge(),
+		// "battery_heater_on":              (*cs).GetBatteryHeaterOn(),
+		// "not_enough_power_to_heat":       (*cs).GetNotEnoughPowerToHeat(),
+		// "off_peak_charging_enabled":      (*cs).GetOffPeakChargingEnabled(),
 	}
 }
 
@@ -72,49 +103,50 @@ MISSING
 	OffPeakChargingEnabled      bool        `json:"off_peak_charging_enabled"`
 */
 
-func ClimateStateFromBle(VehicleData *carserver.VehicleData) ClimateState {
-	return ClimateState{
-		Timestamp:                              VehicleData.ClimateState.GetTimestamp().AsTime().Unix(),
-		AllowCabinOverheatProtection:           VehicleData.ClimateState.GetAllowCabinOverheatProtection(),
-		AutoSeatClimateLeft:                    VehicleData.ClimateState.GetAutoSeatClimateLeft(),
-		AutoSeatClimateRight:                   VehicleData.ClimateState.GetAutoSeatClimateRight(),
-		AutoSteeringWheelHeat:                  VehicleData.ClimateState.GetAutoSteeringWheelHeat(),
-		BioweaponMode:                          VehicleData.ClimateState.GetBioweaponModeOn(),
-		CabinOverheatProtection:                flatten(VehicleData.ClimateState.GetCabinOverheatProtection().String()),
-		CabinOverheatProtectionActivelyCooling: VehicleData.ClimateState.GetCabinOverheatProtectionActivelyCooling(),
-		CopActivationTemperature:               flatten(VehicleData.ClimateState.GetCopActivationTemperature().String()),
-		InsideTemp:                             VehicleData.ClimateState.GetInsideTempCelsius(),
-		OutsideTemp:                            VehicleData.ClimateState.GetOutsideTempCelsius(),
-		DriverTempSetting:                      VehicleData.ClimateState.GetDriverTempSetting(),
-		PassengerTempSetting:                   VehicleData.ClimateState.GetPassengerTempSetting(),
-		LeftTempDirection:                      VehicleData.ClimateState.GetLeftTempDirection(),
-		RightTempDirection:                     VehicleData.ClimateState.GetRightTempDirection(),
-		IsAutoConditioningOn:                   VehicleData.ClimateState.GetIsAutoConditioningOn(),
-		IsFrontDefrosterOn:                     VehicleData.ClimateState.GetIsFrontDefrosterOn(),
-		IsRearDefrosterOn:                      VehicleData.ClimateState.GetIsRearDefrosterOn(),
-		FanStatus:                              VehicleData.ClimateState.GetFanStatus(),
-		HvacAutoRequest:                        flatten(VehicleData.ClimateState.GetHvacAutoRequest().String()),
-		IsClimateOn:                            VehicleData.ClimateState.GetIsClimateOn(),
-		MinAvailTemp:                           VehicleData.ClimateState.GetMinAvailTempCelsius(),
-		MaxAvailTemp:                           VehicleData.ClimateState.GetMaxAvailTempCelsius(),
-		SeatHeaterLeft:                         VehicleData.ClimateState.GetSeatHeaterLeft(),
-		SeatHeaterRight:                        VehicleData.ClimateState.GetSeatHeaterRight(),
-		SeatHeaterRearLeft:                     VehicleData.ClimateState.GetSeatHeaterRearLeft(),
-		SeatHeaterRearRight:                    VehicleData.ClimateState.GetSeatHeaterRearRight(),
-		SeatHeaterRearCenter:                   VehicleData.ClimateState.GetSeatHeaterRearCenter(),
-		SeatHeaterRearRightBack:                VehicleData.ClimateState.GetSeatHeaterRearRightBack(),
-		SeatHeaterRearLeftBack:                 VehicleData.ClimateState.GetSeatHeaterRearLeftBack(),
-		SteeringWheelHeatLevel:                 int32(*VehicleData.ClimateState.GetSteeringWheelHeatLevel().Enum()),
-		SteeringWheelHeater:                    VehicleData.ClimateState.GetSteeringWheelHeater(),
-		SupportsFanOnlyCabinOverheatProtection: VehicleData.ClimateState.GetSupportsFanOnlyCabinOverheatProtection(),
-		BatteryHeater:                          VehicleData.ClimateState.GetBatteryHeater(),
-		BatteryHeaterNoPower:                   VehicleData.ClimateState.GetBatteryHeaterNoPower(),
-		ClimateKeeperMode:                      flatten(VehicleData.ClimateState.GetClimateKeeperMode().String()),
-		DefrostMode:                            flatten(VehicleData.ClimateState.GetDefrostMode().String()),
-		IsPreconditioning:                      VehicleData.ClimateState.GetIsPreconditioning(),
-		RemoteHeaterControlEnabled:             VehicleData.ClimateState.GetRemoteHeaterControlEnabled(),
-		SideMirrorHeaters:                      VehicleData.ClimateState.GetSideMirrorHeaters(),
-		WiperBladeHeater:                       VehicleData.ClimateState.GetWiperBladeHeater(),
+func ClimateStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	cs := &vehicleData.ClimateState
+	return map[string]interface{}{
+		"timestamp":                                   (*cs).GetTimestamp().AsTime().Unix(),
+		"allow_cabin_overheat_protection":             (*cs).GetAllowCabinOverheatProtection(),
+		"auto_seat_climate_left":                      (*cs).GetAutoSeatClimateLeft(),
+		"auto_seat_climate_right":                     (*cs).GetAutoSeatClimateRight(),
+		"auto_steering_wheel_heat":                    (*cs).GetAutoSteeringWheelHeat(),
+		"bioweapon_mode":                              (*cs).GetBioweaponModeOn(),
+		"cabin_overheat_protection":                   flatten((*cs).GetCabinOverheatProtection().String()),
+		"cabin_overheat_protection_actively_cooling":  (*cs).GetCabinOverheatProtectionActivelyCooling(),
+		"cop_activation_temperature":                  flatten((*cs).GetCopActivationTemperature().String()),
+		"inside_temp":                                 (*cs).GetInsideTempCelsius(),
+		"outside_temp":                                (*cs).GetOutsideTempCelsius(),
+		"driver_temp_setting":                         (*cs).GetDriverTempSetting(),
+		"passenger_temp_setting":                      (*cs).GetPassengerTempSetting(),
+		"left_temp_direction":                         (*cs).GetLeftTempDirection(),
+		"right_temp_direction":                        (*cs).GetRightTempDirection(),
+		"is_auto_conditioning_on":                     (*cs).GetIsAutoConditioningOn(),
+		"is_front_defroster_on":                       (*cs).GetIsFrontDefrosterOn(),
+		"is_rear_defroster_on":                        (*cs).GetIsRearDefrosterOn(),
+		"fan_status":                                  (*cs).GetFanStatus(),
+		"hvac_auto_request":                           flatten((*cs).GetHvacAutoRequest().String()),
+		"is_climate_on":                               (*cs).GetIsClimateOn(),
+		"min_avail_temp":                              (*cs).GetMinAvailTempCelsius(),
+		"max_avail_temp":                              (*cs).GetMaxAvailTempCelsius(),
+		"seat_heater_left":                            (*cs).GetSeatHeaterLeft(),
+		"seat_heater_right":                           (*cs).GetSeatHeaterRight(),
+		"seat_heater_rear_left":                       (*cs).GetSeatHeaterRearLeft(),
+		"seat_heater_rear_right":                      (*cs).GetSeatHeaterRearRight(),
+		"seat_heater_rear_center":                     (*cs).GetSeatHeaterRearCenter(),
+		"seat_heater_rear_right_back":                 (*cs).GetSeatHeaterRearRightBack(),
+		"seat_heater_rear_left_back":                  (*cs).GetSeatHeaterRearLeftBack(),
+		"steering_wheel_heat_level":                   int32(*(*cs).GetSteeringWheelHeatLevel().Enum()),
+		"steering_wheel_heater":                       (*cs).GetSteeringWheelHeater(),
+		"supports_fan_only_cabin_overheat_protection": (*cs).GetSupportsFanOnlyCabinOverheatProtection(),
+		"battery_heater":                              (*cs).GetBatteryHeater(),
+		"battery_heater_no_power":                     (*cs).GetBatteryHeaterNoPower(),
+		"climate_keeper_mode":                         flatten((*cs).GetClimateKeeperMode().String()),
+		"defrost_mode":                                flatten((*cs).GetDefrostMode().String()),
+		"is_preconditioning":                          (*cs).GetIsPreconditioning(),
+		"remote_heater_control_enabled":               (*cs).GetRemoteHeaterControlEnabled(),
+		"side_mirror_heaters":                         (*cs).GetSideMirrorHeaters(),
+		"wiper_blade_heater":                          (*cs).GetWiperBladeHeater(),
 	}
 }
 
@@ -122,3 +154,16 @@ func ClimateStateFromBle(VehicleData *carserver.VehicleData) ClimateState {
 MISSING
 	SmartPreconditioning       bool        `json:"smart_preconditioning"`
 */
+
+// func ChargeStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {}
+// func ClimateStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func DriveStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+// func LocationDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func ClosuresStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func ChargeScheduleDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func PreconditioningScheduleDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func TirePressureFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func MediaFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+// func MediaDetailFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+// func SoftwareUpdateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// func ParentalControlsFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)

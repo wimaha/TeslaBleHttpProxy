@@ -1,6 +1,6 @@
 # TeslaBleHttpProxy
 
-TeslaBleHttpProxy is a program written in Go that receives HTTP requests and forwards them via Bluetooth to a Tesla vehicle. The program can, for example, be easily used together with [evcc](https://github.com/evcc-io/evcc).
+TeslaBleHttpProxy is a program written in Go that receives HTTP requests and forwards them via Bluetooth to a Tesla vehicle. The program can, for example, be easily used together with [evcc](https://github.com/evcc-io/evcc) or [TeslaBle2Mqtt](https://github.com/Lenart12/TeslaBle2Mqtt).
 
 The program stores the received requests in a queue and processes them one by one. This ensures that only one Bluetooth connection to the vehicle is established at a time.
 
@@ -30,7 +30,7 @@ services:
     image: wimaha/tesla-ble-http-proxy
     container_name: tesla-ble-http-proxy
     environment:
-      - cacheMaxAge=30 # Optional, but recommended to set this to anything more than 0 if you are using the vehicle data
+      - cacheMaxAge=5 # Optional, but recommended to set this to anything more than 0 if you are using the vehicle data
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus
@@ -120,24 +120,9 @@ If you want to use this proxy only for commands, and not for vehicle data, you c
 
 ### Vehicle Commands
 
-The program uses the same interfaces as the Tesla [Fleet API](https://developer.tesla.com/docs/fleet-api#vehicle-commands). Currently, the following requests are supported: 
+The program uses the same interfaces as the Tesla [Fleet API](https://developer.tesla.com/docs/fleet-api#vehicle-commands). Currently, most commands are supported.
 
-- wake_up
-- charge_start
-- charge_stop
-- set_charging_amps
-- set_charge_limit
-- auto_conditioning_start
-- auto_conditioning_stop
-- charge_port_door_open
-- charge_port_door_close
-- flash_lights
-- honk_horn
-- door_lock
-- door_unlock
-- set_sentry_mode
-
-By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`.
+By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true` (`charge_start?wait=true`).
 
 #### Example Request
 
@@ -180,17 +165,39 @@ This is recommended if you want to receive data frequently, since it will reduce
 ### Body Controller State
 
 The body controller state is fetched from the vehicle and returnes the state of the body controller. The request does not wake up the vehicle. The following information is returned:
-
-- `vehicleLockState`
+- `closure_statuses`	
+  - `charge_port`
+    - `CLOSURESTATE_CLOSED`
+    - `CLOSURESTATE_OPEN`
+    - `CLOSURESTATE_AJAR`
+    - `CLOSURESTATE_UNKNOWN`
+    - `CLOSURESTATE_FAILED_UNLATCH`
+    - `CLOSURESTATE_OPENING`
+    - `CLOSURESTATE_CLOSING`
+  - `front_driver_door`
+    - ...
+  - `front_passenger_door`
+    - ...
+  - `front_trunk`
+    - ...
+  - `rear_driver_door`
+    - ...
+  - `rear_passenger_door`
+    - ...
+  - `rear_trunk`
+    - ...
+  - `tonneau`
+    - ...
+- `vehicle_lock_state`
   - `VEHICLELOCKSTATE_UNLOCKED`
   - `VEHICLELOCKSTATE_LOCKED`
   - `VEHICLELOCKSTATE_INTERNAL_LOCKED`
   - `VEHICLELOCKSTATE_SELECTIVE_UNLOCKED`
-- `vehicleSleepStatus`
+- `vehicle_sleep_status`
   - `VEHICLE_SLEEP_STATUS_UNKNOWN`
   - `VEHICLE_SLEEP_STATUS_AWAKE`
   - `VEHICLE_SLEEP_STATUS_ASLEEP`
-- `userPresence`
+- `user_presence`
   - `VEHICLE_USER_PRESENCE_UNKNOWN`
   - `VEHICLE_USER_PRESENCE_NOT_PRESENT`
   - `VEHICLE_USER_PRESENCE_PRESENT`
@@ -200,4 +207,14 @@ The body controller state is fetched from the vehicle and returnes the state of 
 *(All requests with method GET.)*
 
 Get body controller state:
-`http://localhost:8080/api/1/vehicles/{VIN}/body_controller_state`
+`http://localhost:8080/api/proxy/1/vehicles/{VIN}/body_controller_state`
+
+### Connection status
+
+Get BLE connection status of the vehicle
+`GET http://localhost:8080/api/proxy/1/vehicles/LRWYGCFSXPC882647/connection_status`
+- `address`
+- `connectable`
+- `local_name`
+- `operated`
+- `rssi`
