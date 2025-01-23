@@ -345,7 +345,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
 	log.Debug("operating connection ...")
 	defer log.Debug("operating connection done")
-	connectionCtx, cancel := context.WithTimeout(context.Background(), 290*time.Second)
+	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
 	defer cancel()
 
 	defer func() { bc.operatedBeacon = nil }()
