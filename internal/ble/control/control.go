@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/pkg/errors"
 	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
@@ -233,16 +234,32 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 
 func (bc *BleControl) startInfotainmentSession(ctx context.Context, car *vehicle.Vehicle) error {
 	log.Debug("start Infotainment session...")
-	// Then we can also connect the infotainment
-	if err := car.StartSession(ctx, []universalmessage.Domain{
-		protocol.DomainVCSEC,
-		protocol.DomainInfotainment,
-	}); err != nil {
-		return fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+
+	for {
+		// FIX: https://github.com/teslamotors/vehicle-command/issues/366
+		// Timeout since we can't rely on car.StartSession to return (even an error) if
+		// the car is not ready yet. Maybe it's a bug in the vehicle package.
+		ctxTry, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+		defer cancel()
+		// Measure time to connect startSession
+		start := time.Now()
+		// Then we can also connect the infotainment
+		if err := car.StartSession(ctxTry, []universalmessage.Domain{
+			protocol.DomainVCSEC,
+			protocol.DomainInfotainment,
+		}); err != nil {
+			if errors.Cause(err) == context.DeadlineExceeded && ctx.Err() == nil {
+				log.Debug("retrying handshake with vehicle")
+				continue
+			}
+			return fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+		}
+		log.Debug("handshake with vehicle successful", "duration", time.Since(start))
+
+		log.Info("connection established")
+		bc.infotainmentSession = true
+		return nil
 	}
-	log.Info("connection established")
-	bc.infotainmentSession = true
-	return nil
 }
 
 func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *commands.Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
