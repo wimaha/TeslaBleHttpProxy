@@ -239,7 +239,7 @@ func (bc *BleControl) startInfotainmentSession(ctx context.Context, car *vehicle
 		// FIX: https://github.com/teslamotors/vehicle-command/issues/366
 		// Timeout since we can't rely on car.StartSession to return (even an error) if
 		// the car is not ready yet. Maybe it's a bug in the vehicle package.
-		ctxTry, cancel := context.WithTimeout(context.Background(), 1000*time.Millisecond)
+		ctxTry, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
 		defer cancel()
 		// Measure time to connect startSession
 		start := time.Now()
