@@ -33,11 +33,12 @@ var CommandSource = struct {
 }
 
 type Command struct {
-	Command  string
-	Source   CommandSourceType
-	Vin      string
-	Body     map[string]interface{}
-	Response *models.ApiResponse
+	Command      string
+	Source       CommandSourceType
+	Vin          string
+	Body         map[string]interface{}
+	TotalRetries int
+	Response     *models.ApiResponse
 }
 
 var categoriesByName = map[string]vehicle.StateCategory{

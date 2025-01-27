@@ -104,7 +104,7 @@ func SendKeysToVehicle(vin string) error {
 		defer car.Disconnect()
 		defer log.Debug("disconnect vehicle (A)")
 
-		_, err, _ := tempBleControl.ExecuteCommand(car, cmd, context.Background())
+		_, err := tempBleControl.ExecuteCommand(car, cmd, context.Background())
 		if err != nil {
 			return err
 		}

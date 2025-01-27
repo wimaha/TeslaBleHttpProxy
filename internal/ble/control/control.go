@@ -367,34 +367,39 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 
 	defer func() { bc.operatedBeacon = nil }()
 
-	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {
+	handleCommand := func(command *commands.Command) *commands.Command {
 		if processIfConnectionStatusCommand(command, command.Vin == firstCommand.Vin) {
-			return false, nil
+			return nil
 		}
 
 		//If new VIN, close connection
 		if command.Vin != firstCommand.Vin {
 			log.Debug("new VIN, so close connection")
-			return true, command
+			return command
 		}
 
-		cmd, err, ctx := bc.ExecuteCommand(car, command, connectionCtx)
+		cmd, err := bc.ExecuteCommand(car, command, connectionCtx)
 
-		// If the connection context is done, return to reoperate the connection
-		if connectionCtx.Err() != nil {
-			return true, cmd
-		}
-		// If the context is not done, return to retry the command
-		if err != nil && ctx.Err() == nil {
-			return true, cmd
+		if err != nil {
+			if command.TotalRetries >= 3 {
+				log.Error("failed to execute command after 3 retries", "command", command.Command, "body", command.Body, "error", err.Error())
+				return nil
+			}
+			if cmd == nil {
+				log.Error("failed to execute command", "command", command.Command, "body", command.Body, "error", err.Error())
+				return nil
+			} else {
+				log.Debug("failed to execute command", "command", command.Command, "body", command.Body, "total retires", command.TotalRetries, "error", err.Error())
+				return cmd
+			}
 		}
 
 		// Successful or api context done so no retry
-		return false, nil
+		return nil
 	}
 
-	doReturn, retryCommand := handleCommand(firstCommand)
-	if doReturn {
+	retryCommand := handleCommand(firstCommand)
+	if retryCommand != nil {
 		return retryCommand
 	}
 
@@ -408,8 +413,8 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 				return nil
 			}
 
-			doReturn, retryCommand := handleCommand(&command)
-			if doReturn {
+			retryCommand := handleCommand(&command)
+			if retryCommand != nil {
 				return retryCommand
 			}
 		case command, ok := <-bc.commandStack:
@@ -417,16 +422,17 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 				return nil
 			}
 
-			doReturn, retryCommand := handleCommand(&command)
-			if doReturn {
+			retryCommand := handleCommand(&command)
+			if retryCommand != nil {
 				return retryCommand
 			}
 		}
 	}
 }
 
-func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command, connectionCtx context.Context) (retryCommand *commands.Command, retErr error, ctx context.Context) {
+func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command, connectionCtx context.Context) (retryCommand *commands.Command, retErr error) {
 	log.Debug("sending", "command", command.Command, "body", command.Body)
+	var ctx context.Context
 	if command.Response != nil && command.Response.Ctx != nil {
 		ctx = command.Response.Ctx
 	} else {
@@ -458,7 +464,7 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 
 	// If the context is already done, return immediately
 	if ctx.Err() != nil {
-		return nil, ctx.Err(), ctx
+		return nil, ctx.Err()
 	}
 
 	// Wrap ctx with connectionCtx
@@ -472,17 +478,23 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		}
 	}()
 
-	for i := 0; i < retryCount; i++ {
-		if i > 0 {
+	dontSkipWait := false
+	for ; command.TotalRetries < retryCount; command.TotalRetries++ {
+		if dontSkipWait {
 			log.Warn(lastErr)
 			log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
 			select {
 			case <-time.After(sleep):
 			case <-ctx.Done():
-				return nil, ctx.Err(), ctx
+				if connectionCtx.Err() != nil {
+					log.Debug("operated connection expired")
+					return command, errors.Wrap(ctx.Err(), "operated connection expired")
+				}
+				return nil, ctx.Err()
 			}
 			sleep *= 2
 		}
+		dontSkipWait = true
 
 		if !bc.infotainmentSession && command.Domain() == commands.Domain.Infotainment {
 			if err := car.Wakeup(ctx); err != nil {
@@ -502,18 +514,18 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		if err == nil {
 			//Successful
 			log.Info("successfully executed", "command", command.Command, "body", command.Body)
-			return nil, nil, ctx
+			return nil, nil
 		} else if !retry {
-			return nil, nil, ctx
+			return nil, nil
 		} else {
 			//closed pipe
 			if strings.Contains(err.Error(), "closed pipe") {
 				//connection lost, returning the command so it can be executed again
-				return command, err, ctx
+				return command, err
 			}
 			lastErr = err
 		}
 	}
-	log.Error("canceled", "command", command.Command, "body", command.Body, "err", lastErr)
-	return nil, lastErr, ctx
+	log.Warn("max retries reached", "command", command.Command, "body", command.Body, "err", lastErr)
+	return nil, lastErr
 }
