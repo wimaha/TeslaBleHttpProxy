@@ -162,6 +162,20 @@ If you want to receive specific data, you can add the endpoints to the request. 
 
 This is recommended if you want to receive data frequently, since it will reduce the time it takes to receive the data.
 
+All of the supported endpoints are:
+- charge_schedule_data
+- charge_state
+- climate_state
+- closures_state
+- drive_state
+- location_data
+- media_detail
+- media
+- parental_controls
+- preconditioning_schedule_data
+- software_update
+- tire_pressure
+
 ### Body Controller State
 
 The body controller state is fetched from the vehicle and returnes the state of the body controller. The request does not wake up the vehicle. The following information is returned:
