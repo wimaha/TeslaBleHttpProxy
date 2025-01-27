@@ -83,26 +83,26 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 					converted = models.ChargeStateFromBle(data)
 				case "climate_state":
 					converted = models.ClimateStateFromBle(data)
-					// case "drive_state":
-					// 	converted = models.DriveStateFromBle(data)
-					// case "location_data":
-					// 	converted = models.LocationDataFromBle(data)
-					// case "closures_state":
-					// 	converted = models.ClosuresStateFromBle(data)
-					// case "charge_schedule_data":
-					// 	converted = models.ChargeScheduleDataFromBle(data)
-					// case "preconditioning_schedule_data":
-					// 	converted = models.PreconditioningScheduleDataFromBle(data)
-					// case "tire_pressure":
-					// 	converted = models.TirePressureFromBle(data)
-					// case "media":
-					// 	converted = models.MediaFromBle(data)
-					// case "media_detail":
-					// 	converted = models.MediaDetailFromBle(data)
-					// case "software_update":
-					// 	converted = models.SoftwareUpdateFromBle(data)
-					// case "parental_controls":
-					// 	converted = models.ParentalControlsFromBle(data)
+				case "drive_state":
+					converted = models.DriveStateFromBle(data)
+				case "location_data":
+					converted = models.LocationDataFromBle(data)
+				case "closures_state":
+					converted = models.ClosuresStateFromBle(data)
+				case "charge_schedule_data":
+					converted = models.ChargeScheduleDataFromBle(data)
+				case "preconditioning_schedule_data":
+					converted = models.PreconditioningScheduleDataFromBle(data)
+				case "tire_pressure":
+					converted = models.TirePressureFromBle(data)
+				case "media":
+					converted = models.MediaFromBle(data)
+				case "media_detail":
+					converted = models.MediaDetailFromBle(data)
+				case "software_update":
+					converted = models.SoftwareUpdateFromBle(data)
+				case "parental_controls":
+					converted = models.ParentalControlsFromBle(data)
 				case "gui_settings":
 					fallthrough
 				case "vehicle_config":

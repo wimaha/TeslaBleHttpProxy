@@ -41,13 +41,13 @@ type Command struct {
 }
 
 var categoriesByName = map[string]vehicle.StateCategory{
-	"charge_state":  vehicle.StateCategoryCharge,
-	"climate_state": vehicle.StateCategoryClimate,
-	// "drive_state":                   vehicle.StateCategoryDrive,
-	// "location_data":                 vehicle.StateCategoryLocation,
-	// "closures_state":                vehicle.StateCategoryClosures,
-	// "charge_schedule_data":          vehicle.StateCategoryChargeSchedule,
-	// "preconditioning_schedule_data": vehicle.StateCategoryPreconditioningSchedule,
+	"charge_state":                  vehicle.StateCategoryCharge,
+	"climate_state":                 vehicle.StateCategoryClimate,
+	"drive_state":                   vehicle.StateCategoryDrive,
+	"location_data":                 vehicle.StateCategoryLocation,
+	"closures_state":                vehicle.StateCategoryClosures,
+	"charge_schedule_data":          vehicle.StateCategoryChargeSchedule,
+	"preconditioning_schedule_data": vehicle.StateCategoryPreconditioningSchedule,
 
 	// Missing standard categories
 	// "gui_settings"
@@ -56,11 +56,11 @@ var categoriesByName = map[string]vehicle.StateCategory{
 	// "vehicle_data_combo"
 
 	// Non-standard categories
-	// "tire_pressure":     vehicle.StateCategoryTirePressure,
-	// "media":             vehicle.StateCategoryMedia,
-	// "media_detail":      vehicle.StateCategoryMediaDetail,
-	// "software_update":   vehicle.StateCategorySoftwareUpdate,
-	// "parental_controls": vehicle.StateCategoryParentalControls,
+	"tire_pressure":     vehicle.StateCategoryTirePressure,
+	"media":             vehicle.StateCategoryMedia,
+	"media_detail":      vehicle.StateCategoryMediaDetail,
+	"software_update":   vehicle.StateCategorySoftwareUpdate,
+	"parental_controls": vehicle.StateCategoryParentalControls,
 }
 
 func (command *Command) Domain() DomainType {

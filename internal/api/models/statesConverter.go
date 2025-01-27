@@ -1,10 +1,15 @@
 package models
 
 import (
+	"encoding/json"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/carserver"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func flatten(s string) any {
@@ -155,15 +160,115 @@ MISSING
 	SmartPreconditioning       bool        `json:"smart_preconditioning"`
 */
 
-// func ChargeStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {}
-// func ClimateStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func DriveStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
-// func LocationDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func ClosuresStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func ChargeScheduleDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func PreconditioningScheduleDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func TirePressureFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func MediaFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
-// func MediaDetailFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
-// func SoftwareUpdateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
-// func ParentalControlsFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {)
+// "Good enough" implementation of converting a protobuf message to a map[string]interface{}
+// This is a workaround for now until we have a better solution or do manual conversion
+// for each message type. It converts the protobuf message to JSON, then to a map and
+// detects objects to flatten, camel case to snake case and converts time to unix timestamp.
+// However, it is not perfect since `omitempty` fields are removed and some fields are
+// missnamed (e.g. `OdometerInHundredthsOfAmile` is `..._amile` not `..._a_mile`).
+func generic_proto_to_map(proto proto.Message) map[string]interface{} {
+	proto_json, err := protojson.Marshal(proto)
+	if err != nil {
+		return nil
+	}
+	var unmarshal any
+	err = json.Unmarshal(proto_json, &unmarshal)
+	if err != nil {
+		return nil
+	}
+	as_map, ok := unmarshal.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	camelToSnake := func(input string) string {
+		re := regexp.MustCompile("([a-z])([A-Z])")
+		snake := re.ReplaceAllString(input, "${1}_${2}")
+		return strings.ToLower(snake)
+	}
+
+	var edit_object func(any)
+
+	edit_object = func(m interface{}) {
+		switch m_ := m.(type) {
+		case map[string]interface{}:
+			rename_keys := make([]string, 0)
+			for k, v := range m_ {
+				mm, ok := v.(map[string]interface{})
+				if ok {
+					// Detect values to be flattened
+					// key: { Value: {} } -> key: Value
+					if len(mm) == 1 {
+						for possible_value, maybe_empty_map := range mm {
+							if mem, ok := maybe_empty_map.(map[string]interface{}); ok {
+								if len(mem) == 0 {
+									m_[k] = possible_value
+								} else {
+									edit_object(maybe_empty_map)
+								}
+							}
+						}
+					} else {
+						edit_object(v)
+					}
+				} else if ms, ok := v.(string); ok {
+					// Maybe timestamp, convert to unix timestamp
+					if t, err := time.Parse(time.RFC3339Nano, ms); err == nil {
+						m_[k] = t.Unix()
+					}
+				} else {
+					edit_object(v)
+				}
+				rename_keys = append(rename_keys, k)
+			}
+			// camel case to snake case
+			for _, k := range rename_keys {
+				snake := camelToSnake(k)
+				if snake == k {
+					continue
+				}
+				m_[snake] = m_[k]
+				delete(m_, k)
+			}
+		case []interface{}:
+			for _, v := range m_ {
+				edit_object(v)
+			}
+		}
+	}
+
+	edit_object(as_map)
+
+	return as_map
+}
+
+func DriveStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.DriveState)
+}
+func LocationDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.LocationState)
+}
+func ClosuresStateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.ClosuresState)
+}
+func ChargeScheduleDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.ChargeScheduleState)
+}
+func PreconditioningScheduleDataFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.PreconditioningScheduleState)
+}
+func TirePressureFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.TirePressureState)
+}
+func MediaFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.MediaState)
+}
+func MediaDetailFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.MediaDetailState)
+}
+func SoftwareUpdateFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.SoftwareUpdateState)
+}
+func ParentalControlsFromBle(vehicleData *carserver.VehicleData) map[string]interface{} {
+	return generic_proto_to_map(vehicleData.ParentalControlsState)
+}
