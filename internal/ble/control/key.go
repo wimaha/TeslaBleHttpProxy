@@ -94,6 +94,7 @@ func SendKeysToVehicle(vin string) error {
 	defer cancel()
 	cmd := &commands.Command{
 		Command: "add-key-request",
+		Source:  commands.CommandSource.TeslaBleHttpProxy,
 		Vin:     vin,
 	}
 	conn, car, _, err := tempBleControl.TryConnectToVehicle(ctx, cmd)

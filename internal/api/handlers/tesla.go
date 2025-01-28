@@ -171,6 +171,7 @@ func ProxyCommand(w http.ResponseWriter, r *http.Request) {
 	switch command {
 	case "connection_status":
 	case "body_controller_state":
+	case "session_info":
 	default:
 		writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: "Unrecognized command: " + command})
 		return
