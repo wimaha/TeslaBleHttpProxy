@@ -828,7 +828,7 @@ var fleetVehicleCommands = map[string]fleetVehicleCommandHandler{
 				return fmt.Errorf("invalid 'lon' value: %f", lon)
 			}
 
-			// Offical API requires token, but it's not needed here
+			// Official API requires token, but it's not needed here
 			// so we just validate it for completeness and to avoid errors
 			if _, ok := args.validateString("token", false); ok != nil {
 				return err

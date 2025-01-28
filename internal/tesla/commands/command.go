@@ -73,7 +73,6 @@ func (command *Command) Domain() DomainType {
 	default:
 		return Domain.Infotainment
 	}
-
 }
 
 func GetCategory(nameStr string) (vehicle.StateCategory, error) {
