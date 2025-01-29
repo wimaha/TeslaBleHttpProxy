@@ -127,10 +127,26 @@ func VehicleEndpoint(w http.ResponseWriter, r *http.Request) {
 	var body map[string]interface{} = nil
 
 	src := commands.CommandSource.FleetVehicleEndpoint
+	wait := true
+
+	checkMethod := func(expected string) bool {
+		if r.Method != expected {
+			writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: "Invalid method: " + r.Method})
+			return false
+		}
+		return true
+	}
 
 	switch command {
 	case "wake_up":
+		if !checkMethod("POST") {
+			return
+		}
+		wait = r.URL.Query().Get("wait") == "true"
 	case "vehicle_data":
+		if !checkMethod("GET") {
+			return
+		}
 		var endpoints []string
 		endpointsString := r.URL.Query().Get("endpoints")
 		if endpointsString != "" {
@@ -158,7 +174,7 @@ func VehicleEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("received", "command", command, "body", body)
-	resp := processCommand(w, r, vin, command, src, body, true)
+	resp := processCommand(w, r, vin, command, src, body, wait)
 	writeResponseWithStatus(w, &resp)
 }
 

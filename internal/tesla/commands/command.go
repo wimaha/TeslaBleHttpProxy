@@ -68,8 +68,6 @@ func (command *Command) Domain() DomainType {
 	switch command.Command {
 	case "body_controller_state":
 		fallthrough
-	case "wake_up":
-		return Domain.VCSEC
 	default:
 		return Domain.Infotainment
 	}

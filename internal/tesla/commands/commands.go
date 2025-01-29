@@ -128,9 +128,9 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			}
 			command.Response.Response = responseJson
 		case "wake_up":
-			if err := car.Wakeup(ctx); err != nil {
-				return true, fmt.Errorf("failed to wake up vehicle: %s", err)
-			}
+			// car.WakeUp and waiting for the car was already handled by the operated
+			// connection, because this is marked as an infotainment domain command
+			// Nothing to do here :^)
 		default:
 			return false, fmt.Errorf("unrecognized vehicle endpoint command: %s", command.Command)
 		}

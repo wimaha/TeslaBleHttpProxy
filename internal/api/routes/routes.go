@@ -14,7 +14,7 @@ func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	// Define the endpoints
 	///api/1/vehicles/{vehicle_tag}/command/set_charging_amps
 	router.HandleFunc("/api/1/vehicles/{vin}/command/{command}", handlers.VehicleCommand).Methods("POST")
-	router.HandleFunc("/api/1/vehicles/{vin}/{command}", handlers.VehicleEndpoint).Methods("GET")
+	router.HandleFunc("/api/1/vehicles/{vin}/{command}", handlers.VehicleEndpoint).Methods("GET", "POST")
 	router.HandleFunc("/api/proxy/1/vehicles/{vin}/{command}", handlers.ProxyCommand).Methods("GET")
 	router.HandleFunc("/dashboard", handlers.ShowDashboard(html)).Methods("GET")
 	router.HandleFunc("/gen_keys", handlers.GenKeys).Methods("GET")
