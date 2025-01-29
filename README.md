@@ -54,7 +54,25 @@ Download the code and save it in a folder named 'TeslaBleHttpProxy'. From there,
 
 ```
 go build .
-./TeslaBleHttpProxy
+./TeslaBleHttpProxy -h
+usage: TeslaBleHttpProxy [-h|--help] [-l|--logLevel "<value>"]
+                         [-b|--httpListenAddress "<value>"] [-s|--scanTimeout
+                         <integer>] [-c|--cacheMaxAge <integer>] [-k|--keys
+                         "<value>"]
+
+                         Proxy for Tesla BLE commands over HTTP
+
+Arguments:
+
+  -h  --help               Print help information
+  -l  --logLevel           Log level (DEBUG, INFO, WARN, ERROR, FATAL).
+                           Default: INFO
+  -b  --httpListenAddress  HTTP bind address. Default: :8080
+  -s  --scanTimeout        Time in seconds to scan for BLE beacons during
+                           device scan (0 = max). Default: 1
+  -c  --cacheMaxAge        Time in seconds for Cache-Control header (0 = no
+                           cache). Default: 5
+  -k  --keys               Path to public and private keys. Default: key
 ```
 
 Please remember to create an empty folder called `key` where the keys can be stored later.
