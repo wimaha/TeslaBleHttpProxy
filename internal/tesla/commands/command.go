@@ -66,8 +66,12 @@ var categoriesByName = map[string]vehicle.StateCategory{
 
 func (command *Command) Domain() DomainType {
 	switch command.Command {
-	case "body_controller_state":
+	case "session_info":
 		fallthrough
+	case "add-key-request":
+		fallthrough
+	case "body_controller_state":
+		return Domain.VCSEC
 	default:
 		return Domain.Infotainment
 	}
