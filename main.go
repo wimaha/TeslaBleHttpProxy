@@ -22,6 +22,8 @@ func main() {
 	log.Infof("TeslaBleHttpProxy %s is loading ...", Version)
 
 	config.InitConfig()
+	level, _ := log.ParseLevel(config.AppConfig.LogLevel)
+	log.SetLevel(level)
 
 	control.SetupBleControl()
 

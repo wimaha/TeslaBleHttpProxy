@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/JuulLabs-OSS/cbgo v0.0.2 // indirect
+	github.com/akamensky/argparse v1.4.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/lipgloss v0.12.1 // indirect
 	github.com/charmbracelet/x/ansi v0.1.4 // indirect

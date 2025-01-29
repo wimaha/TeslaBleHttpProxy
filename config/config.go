@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"os"
-	"strconv"
 
+	"github.com/akamensky/argparse"
 	"github.com/charmbracelet/log"
 )
 
@@ -20,46 +22,49 @@ type Config struct {
 var AppConfig *Config
 
 func LoadConfig() *Config {
-	envLogLevel := os.Getenv("logLevel")
-	if envLogLevel == "debug" {
-		log.SetLevel(log.DebugLevel)
-		log.Debug("LogLevel set to debug")
-	}
-	if envLogLevel == "" {
-		envLogLevel = "info"
+	parser := argparse.NewParser("TeslaBleHttpProxy", "Proxy for Tesla BLE commands over HTTP")
+	logLevel := parser.String("l", "logLevel", &argparse.Options{Help: "Log level (DEBUG, INFO, WARN, ERROR, FATAL)", Default: "INFO", Validate: func(args []string) error {
+		if _, err := log.ParseLevel(args[0]); err != nil {
+			return err
+		}
+		return nil
+	}})
+	httpListenAddress := parser.String("b", "httpListenAddress", &argparse.Options{Help: "HTTP bind address", Default: ":8080", Validate: func(args []string) error {
+		// Check if the proxy host is a valid URL
+		url, err := url.Parse(fmt.Sprintf("//%s", args[0]))
+		if err != nil {
+			return fmt.Errorf("invalid bind address (%s)", err)
+		}
+		if url.Path != "" {
+			return fmt.Errorf("bind address must not contain a path or scheme")
+		}
+		return nil
+	}})
+	scanTimeout := parser.Int("s", "scanTimeout", &argparse.Options{Help: "Time in seconds to scan for BLE beacons during device scan (0 = max)", Default: 1})
+	cacheMaxAge := parser.Int("c", "cacheMaxAge", &argparse.Options{Help: "Time in seconds for Cache-Control header (0 = no cache)", Default: 5})
+
+	// Inject environment variables as command line arguments
+	args := os.Args
+	for _, arg := range parser.GetArgs() {
+		if arg.GetPositional() || arg.GetLname() == "help" {
+			continue
+		}
+		osArg := os.Getenv(arg.GetLname())
+		if osArg != "" {
+			args = append(args, fmt.Sprintf("--%s=%s", arg.GetLname(), osArg))
+		}
 	}
 
-	addr := os.Getenv("httpListenAddress")
-	if addr == "" {
-		addr = ":8080"
-	}
-	log.Info("TeslaBleHttpProxy", "httpListenAddress", addr)
-
-	scanTimeout := os.Getenv("scanTimeout")
-	if scanTimeout == "" {
-		scanTimeout = "1" // default value
-	}
-	scanTimeoutInt, err := strconv.Atoi(scanTimeout)
-	if err != nil || scanTimeoutInt < 0 {
-		log.Error("Invalid scanTimeout value, using default (1)", "error", err)
-		scanTimeoutInt = 1
-	}
-
-	cacheMaxAge := os.Getenv("cacheMaxAge")
-	if cacheMaxAge == "" {
-		cacheMaxAge = "0" // default value
-	}
-	cacheMaxAgeInt, err := strconv.Atoi(cacheMaxAge)
-	if err != nil || cacheMaxAgeInt < 0 {
-		log.Error("Invalid cacheMaxAge value, using default (0)", "error", err)
-		cacheMaxAgeInt = 0
+	err := parser.Parse(args)
+	if err != nil {
+		log.Fatal("Failed to parse arguments", "error", err)
 	}
 
 	return &Config{
-		LogLevel:          envLogLevel,
-		HttpListenAddress: addr,
-		ScanTimeout:       scanTimeoutInt,
-		CacheMaxAge:       cacheMaxAgeInt,
+		LogLevel:          *logLevel,
+		HttpListenAddress: *httpListenAddress,
+		ScanTimeout:       *scanTimeout,
+		CacheMaxAge:       *cacheMaxAge,
 	}
 }
 
