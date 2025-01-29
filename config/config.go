@@ -42,6 +42,16 @@ func LoadConfig() *Config {
 	}})
 	scanTimeout := parser.Int("s", "scanTimeout", &argparse.Options{Help: "Time in seconds to scan for BLE beacons during device scan (0 = max)", Default: 1})
 	cacheMaxAge := parser.Int("c", "cacheMaxAge", &argparse.Options{Help: "Time in seconds for Cache-Control header (0 = no cache)", Default: 5})
+	keys := parser.String("k", "keys", &argparse.Options{Help: "Path to public and private keys", Default: "key", Validate: func(args []string) error {
+		f, err := os.Stat(args[0])
+		if err != nil {
+			return fmt.Errorf("failed to find keys directory (%s)", err)
+		}
+		if !f.IsDir() {
+			return fmt.Errorf("keys is not a directory")
+		}
+		return nil
+	}})
 
 	// Inject environment variables as command line arguments
 	args := os.Args
@@ -59,6 +69,9 @@ func LoadConfig() *Config {
 	if err != nil {
 		log.Fatal("Failed to parse arguments", "error", err)
 	}
+
+	PublicKeyFile = fmt.Sprintf("%s/public.pem", *keys)
+	PrivateKeyFile = fmt.Sprintf("%s/private.pem", *keys)
 
 	return &Config{
 		LogLevel:          *logLevel,
