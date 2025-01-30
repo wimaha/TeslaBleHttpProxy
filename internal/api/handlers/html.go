@@ -19,6 +19,7 @@ type DashboardParams struct {
 	PublicKey     string
 	ShouldGenKeys bool
 	Messages      []models.Message
+	BaseUrl       string
 }
 
 func ShowDashboard(html fs.FS) http.HandlerFunc {
@@ -43,6 +44,7 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 			PublicKey:     publicKey,
 			ShouldGenKeys: shouldGenKeys,
 			Messages:      messages,
+			BaseUrl:       config.AppConfig.ProxyBaseURL,
 		}
 		if err := Dashboard(w, p, "", html); err != nil {
 			log.Error("error showing dashboard", "error", err)
@@ -67,7 +69,8 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 			Type:    models.Error,
 		})
 	}
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	base := config.AppConfig.ProxyBaseURL
+	http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
 }
 
 func RemoveKeys(w http.ResponseWriter, r *http.Request) {
@@ -96,12 +99,14 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	control.CloseBleControl()
-	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+	base := config.AppConfig.ProxyBaseURL
+	http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
 }
 
 func SendKey(w http.ResponseWriter, r *http.Request) {
 	defer func() {
-		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		base := config.AppConfig.ProxyBaseURL
+		http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
 	}()
 
 	if r.Method == http.MethodPost {

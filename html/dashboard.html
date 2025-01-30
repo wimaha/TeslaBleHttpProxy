@@ -27,14 +27,14 @@
     </ul>
     {{ if eq .ShouldGenKeys true }}
     <div class="add-setting">
-        <form action="/gen_keys" method="GET"><button id="add-button" class="add-button">generate Keys</button></form>
+        <form action="{{.BaseUrl}}/gen_keys" method="GET"><button id="add-button" class="add-button">generate Keys</button></form>
     </div>
     {{ else }}
     <div class="add-setting">
         <span><br>Important: Only use this function, if you know what you are doing. This can't be undone!</span>
     </div>
     <div class="add-setting">
-        <form id="remove-keys-form" action="/remove_keys" method="GET">
+        <form id="remove-keys-form" action="{{.BaseUrl}}/remove_keys" method="GET">
             <button id="add-button" class="save-button" type="button">remove Keys</button>
         </form>
     </div>
@@ -55,7 +55,7 @@
     <div class="add-setting">
         <span>The vehicle has to be awake! So you have to manually wake the vehicle before you send the key to the vehicle.</span>
     </div>
-    <form id="send-key-form" action="/send_key" method="POST">
+    <form id="send-key-form" action="{{.BaseUrl}}/send_key" method="POST">
         <ul class="settings-list">
             <li>
                 <div class="setting">

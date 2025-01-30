@@ -15,8 +15,9 @@ var PrivateKeyFile = "key/private.pem"
 type Config struct {
 	LogLevel          string
 	HttpListenAddress string
-	ScanTimeout       int // Seconds to scan for BLE beacons during device scan (0 = max)
-	CacheMaxAge       int // Seconds to cache BLE responses
+	ScanTimeout       int    // Seconds to scan for BLE beacons during device scan (0 = max)
+	CacheMaxAge       int    // Seconds to cache BLE responses
+	ProxyBaseURL      string // Base URL for proxying BLE commands (Useful if the proxy is behind a reverse proxy)
 }
 
 var AppConfig *Config
@@ -52,6 +53,7 @@ func LoadConfig() *Config {
 		}
 		return nil
 	}})
+	proxyBaseUrl := parser.String("p", "proxyBaseUrl", &argparse.Options{Help: "Base URL for proxying BLE commands (Useful if the proxy is behind a reverse proxy)", Default: ""})
 
 	// Inject environment variables as command line arguments
 	args := os.Args
@@ -78,6 +80,7 @@ func LoadConfig() *Config {
 		HttpListenAddress: *httpListenAddress,
 		ScanTimeout:       *scanTimeout,
 		CacheMaxAge:       *cacheMaxAge,
+		ProxyBaseURL:      *proxyBaseUrl,
 	}
 }
 
