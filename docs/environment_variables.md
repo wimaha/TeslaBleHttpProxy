@@ -14,6 +14,22 @@ This is the value that will be set in Cache-Control header for vehicle data and 
 
 This is the address and port to listen for HTTP requests. (Default: :8080)
 
+## keys
+
+Path to public and private keys. (Default: key)
+
+## dashboardBaseUrl
+
+Base URL for dashboard (Useful if the proxy is behind a reverse proxy). (Default: empty)  
+
+## apiBaseUrl
+
+Base URL for proxying API commands. (Default: empty)
+
+> [!NOTE]
+> It will adjust its base path depending on the `X-Ingress-Path` and `X-Forwarded-Prefix`
+> headers, regardless of what either of the base url is set to.
+
 # Example
 
 ## Docker compose

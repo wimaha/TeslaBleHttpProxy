@@ -66,7 +66,8 @@ go build .
 usage: TeslaBleHttpProxy [-h|--help] [-l|--logLevel "<value>"]
                          [-b|--httpListenAddress "<value>"] [-s|--scanTimeout
                          <integer>] [-c|--cacheMaxAge <integer>] [-k|--keys
-                         "<value>"]
+                         "<value>"] [-d|--dashboardBaseUrl "<value>"]
+                         [-a|--apiBaseUrl "<value>"]
 
                          Proxy for Tesla BLE commands over HTTP
 
@@ -81,6 +82,9 @@ Arguments:
   -c  --cacheMaxAge        Time in seconds for Cache-Control header (0 = no
                            cache). Default: 5
   -k  --keys               Path to public and private keys. Default: key
+  -d  --dashboardBaseUrl   Base URL for dashboard (Useful if the proxy is
+                           behind a reverse proxy). Default: 
+  -a  --apiBaseUrl         Base URL for proxying API commands. Default: 
 ```
 
 Please remember to create an empty folder called `key` where the keys can be stored later.
