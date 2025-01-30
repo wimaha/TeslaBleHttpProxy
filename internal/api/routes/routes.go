@@ -27,5 +27,11 @@ func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 	})
 
+	// 404 show route
+	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		http.Error(w, "404 page not found: "+path, http.StatusNotFound)
+	})
+
 	return router
 }
