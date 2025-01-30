@@ -17,7 +17,8 @@ type Config struct {
 	HttpListenAddress string
 	ScanTimeout       int    // Seconds to scan for BLE beacons during device scan (0 = max)
 	CacheMaxAge       int    // Seconds to cache BLE responses
-	ProxyBaseURL      string // Base URL for proxying BLE commands (Useful if the proxy is behind a reverse proxy)
+	DashboardBaseURL  string // Base URL for proxying dashboard (Useful if the proxy is behind a reverse proxy)
+	ApiBaseUrl        string // Base URL for proxying BLE commands (Useful if the proxy is behind a reverse proxy)
 }
 
 var AppConfig *Config
@@ -53,8 +54,8 @@ func LoadConfig() *Config {
 		}
 		return nil
 	}})
-	proxyBaseUrl := parser.String("p", "proxyBaseUrl", &argparse.Options{Help: "Base URL for proxying BLE commands (Useful if the proxy is behind a reverse proxy)", Default: ""})
-
+	dashboardBaseUrl := parser.String("d", "dashboardBaseUrl", &argparse.Options{Help: "Base URL for dashboard (Useful if the proxy is behind a reverse proxy)", Default: ""})
+	apiBaseUrl := parser.String("a", "apiBaseUrl", &argparse.Options{Help: "Base URL for proxying API commands", Default: ""})
 	// Inject environment variables as command line arguments
 	args := os.Args
 	for _, arg := range parser.GetArgs() {
@@ -80,7 +81,8 @@ func LoadConfig() *Config {
 		HttpListenAddress: *httpListenAddress,
 		ScanTimeout:       *scanTimeout,
 		CacheMaxAge:       *cacheMaxAge,
-		ProxyBaseURL:      *proxyBaseUrl,
+		DashboardBaseURL:  *dashboardBaseUrl,
+		ApiBaseUrl:        *apiBaseUrl,
 	}
 }
 

@@ -13,31 +13,33 @@ import (
 func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	router := mux.NewRouter()
 
-	base := config.AppConfig.ProxyBaseURL
+	apiBase := config.AppConfig.ApiBaseUrl
+	dashboardBase := config.AppConfig.DashboardBaseURL
 
 	// Define the endpoints
-	router.HandleFunc(base+"/api/1/vehicles/{vin}/command/{command}", handlers.VehicleCommand).Methods("POST")
-	router.HandleFunc(base+"/api/1/vehicles/{vin}/{command}", handlers.VehicleEndpoint).Methods("GET", "POST")
-	router.HandleFunc(base+"/api/proxy/1/vehicles/{vin}/{command}", handlers.ProxyCommand).Methods("GET")
-	router.HandleFunc(base+"/dashboard", handlers.ShowDashboard(html)).Methods("GET")
-	router.HandleFunc(base+"/gen_keys", handlers.GenKeys).Methods("GET")
-	router.HandleFunc(base+"/remove_keys", handlers.RemoveKeys).Methods("GET")
-	router.HandleFunc(base+"/send_key", handlers.SendKey).Methods("POST")
+	router.HandleFunc(apiBase+"/api/1/vehicles/{vin}/command/{command}", handlers.VehicleCommand).Methods("POST")
+	router.HandleFunc(apiBase+"/api/1/vehicles/{vin}/{command}", handlers.VehicleEndpoint).Methods("GET", "POST")
+	router.HandleFunc(apiBase+"/api/proxy/1/vehicles/{vin}/{command}", handlers.ProxyCommand).Methods("GET")
+	router.HandleFunc(dashboardBase+"/dashboard", handlers.ShowDashboard(html)).Methods("GET")
+	router.HandleFunc(dashboardBase+"/gen_keys", handlers.GenKeys).Methods("GET")
+	router.HandleFunc(dashboardBase+"/remove_keys", handlers.RemoveKeys).Methods("GET")
+	router.HandleFunc(dashboardBase+"/send_key", handlers.SendKey).Methods("POST")
 
 	// Static files
 	staticHandler := http.FileServer(http.FS(static))
-	if base != "" {
-		staticHandler = http.StripPrefix(base, staticHandler)
+	if dashboardBase != "" {
+		staticHandler = http.StripPrefix(dashboardBase, staticHandler)
 	}
-	router.PathPrefix(base + "/static/").Handler(staticHandler)
+	router.PathPrefix(dashboardBase + "/static/").Handler(staticHandler)
 
 	// Redirect / to /dashboard
-	indexPath := base
-	if len(indexPath) == 0 {
-		indexPath = "/"
+	indexPath := dashboardBase
+	if len(indexPath) == 0 || indexPath[len(indexPath)-1] != '/' {
+		indexPath += "/"
 	}
 	router.HandleFunc(indexPath, func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
+		log.Debugf("redirecting %s to %s", r.URL, dashboardBase+"/dashboard")
+		http.Redirect(w, r, dashboardBase+"/dashboard", http.StatusSeeOther)
 	})
 
 	router.MethodNotAllowedHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
