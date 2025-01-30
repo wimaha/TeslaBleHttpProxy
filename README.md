@@ -7,6 +7,7 @@ The program stores the received requests in a queue and processes them one by on
 ## Table of Contents
 
 - [How to install](#how-to-install)
+  - [Home assistant addon](#home-assistant-addon)
   - [Docker compose](#docker-compose)
   - [Build yourself](#build-yourself)
 - [Generate key for vehicle](#generate-key-for-vehicle)
@@ -18,7 +19,14 @@ The program stores the received requests in a queue and processes them one by on
 
 ## How to install
 
-You can either compile and use the Go program yourself or install it in a Docker container. ([detailed instruction](docs/installation.md))
+You can either compile and use the Go program yourself or install it as a Home assistant addon or in a Docker container. ([detailed instruction](docs/installation.md))
+
+### Home assistant addon
+
+This proxy is availabile in the [TeslaBle2Mqtt-addon](https://github.com/Lenart12/TeslaBle2Mqtt-addon) repository, included as part of `TeslaBle2Mqtt` addon or as a standalone `TeslaBleHttpProxy` addon.
+
+[![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https://github.com/Lenart12/TeslaBle2Mqtt-addon)
+
 
 ### Docker compose
 
