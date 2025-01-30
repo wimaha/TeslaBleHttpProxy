@@ -44,7 +44,7 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 			PublicKey:     publicKey,
 			ShouldGenKeys: shouldGenKeys,
 			Messages:      messages,
-			BaseUrl:       config.AppConfig.DashboardBaseURL,
+			BaseUrl:       r.PathValue("basePath"),
 		}
 		if err := Dashboard(w, p, "", html); err != nil {
 			log.Error("error showing dashboard", "error", err)
@@ -69,7 +69,7 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 			Type:    models.Error,
 		})
 	}
-	base := config.AppConfig.DashboardBaseURL
+	base := r.PathValue("basePath")
 	http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
 }
 
@@ -99,13 +99,13 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	control.CloseBleControl()
-	base := config.AppConfig.DashboardBaseURL
+	base := r.PathValue("basePath")
 	http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
 }
 
 func SendKey(w http.ResponseWriter, r *http.Request) {
 	defer func() {
-		base := config.AppConfig.DashboardBaseURL
+		base := r.PathValue("basePath")
 		http.Redirect(w, r, base+"/dashboard", http.StatusSeeOther)
 	}()
 
