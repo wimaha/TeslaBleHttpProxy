@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -100,11 +99,8 @@ func VehicleCommand(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the body is empty
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		if err != io.EOF {
-			log.Error("decoding body", "err", err)
-			writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: "Failed to decode body"})
-			return
-		}
+		log.Debug("decoding body", "err", err)
+		// If json fails we try to validate anyways
 	}
 
 	if err := commands.ValidateFleetVehicleCommand(command, body); err != nil {
