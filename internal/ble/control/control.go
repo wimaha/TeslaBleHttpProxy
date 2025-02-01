@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"strings"
 	"time"
@@ -144,8 +143,8 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 		resp = map[string]interface{}{
 			"local_name":  ble.VehicleLocalName(command.Vin),
 			"connectable": false,
-			"address":     "",
-			"rssi":        math.MinInt32,
+			"address":     nil,
+			"rssi":        nil,
 			"operated":    false,
 		}
 	}
