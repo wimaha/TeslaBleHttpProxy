@@ -256,7 +256,7 @@ Get body controller state:
 ### Connection status
 
 Get BLE connection status of the vehicle
-`GET http://localhost:8080/api/proxy/1/vehicles/LRWYGCFSXPC882647/connection_status`
+`GET http://localhost:8080/api/proxy/1/vehicles/{VIN}/connection_status`
 - `address`
 - `connectable`
 - `local_name`
