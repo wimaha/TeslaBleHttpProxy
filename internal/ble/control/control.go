@@ -36,7 +36,7 @@ func CloseBleControl() {
 
 type BleControl struct {
 	privateKey          protocol.ECDHPrivateKey
-	operatedBeacon      *ble.Advertisement
+	operatedBeacon      *ble.ScanResult
 	infotainmentSession bool
 
 	commandStack  chan commands.Command
@@ -106,11 +106,11 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 		command.Response.Result = true
 	}
 
-	var beacon ble.Advertisement = nil
+	var beacon *ble.ScanResult = nil
 
 	if operated {
 		if BleControlInstance.operatedBeacon != nil {
-			beacon = *BleControlInstance.operatedBeacon
+			beacon = BleControlInstance.operatedBeacon
 		} else {
 			log.Warn("operated beacon is nil but operated is true")
 		}
@@ -133,10 +133,10 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 	var resp map[string]interface{}
 	if beacon != nil {
 		resp = map[string]interface{}{
-			"local_name":  beacon.LocalName(),
-			"connectable": beacon.Connectable(),
-			"address":     beacon.Addr().String(),
-			"rssi":        beacon.RSSI(),
+			"local_name":  beacon.LocalName,
+			"connectable": true,
+			"address":     beacon.Address.String(),
+			"rssi":        beacon.RSSI,
 			"operated":    operated,
 		}
 	} else {
@@ -291,7 +291,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	}
 	defer cancelScan()
 
-	beacon, err := ble.ScanVehicleBeacon(scanCtx, firstCommand.Vin)
+	scanResult, err := ble.ScanVehicleBeacon(scanCtx, firstCommand.Vin)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
 			// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
@@ -304,10 +304,10 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		}
 	}
 
-	log.Debug("beacon found", "localName", beacon.LocalName(), "addr", beacon.Addr(), "rssi", beacon.RSSI())
+	log.Debug("beacon found", "localName", scanResult.LocalName, "addr", scanResult.Address.String(), "rssi", scanResult.RSSI)
 
 	log.Debug("dialing to vehicle ...")
-	conn, err = ble.NewConnectionToBleTarget(ctx, firstCommand.Vin, beacon)
+	conn, err = ble.NewConnectionToBleTarget(ctx, firstCommand.Vin, scanResult)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 	}
@@ -351,7 +351,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		log.Info("Key-Request connection established")
 	}
 
-	bc.operatedBeacon = &beacon
+	bc.operatedBeacon = scanResult
 
 	// everything fine
 	shouldDefer = false
