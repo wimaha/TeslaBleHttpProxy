@@ -14,6 +14,13 @@ This is the value that will be set in Cache-Control header for vehicle data and 
 
 This is the address and port to listen for HTTP requests. (Default: :8080)
 
+## bdAdapter
+
+Specify which Bluetooth adapter to use by setting this option to its Bluetooth device ID.
+The correct ID is in the format of `hciX`.
+
+Only supported on Linux. 
+
 ## keys
 
 Path to public and private keys. (Default: key)

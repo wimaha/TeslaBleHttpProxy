@@ -37,4 +37,5 @@ require (
 	tinygo.org/x/bluetooth v0.11.0 // indirect
 )
 
-replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250211223038-6948c3358933
+// Replace untill https://github.com/teslamotors/vehicle-command/pull/373 is merged
+replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250211233450-8e999651b66d

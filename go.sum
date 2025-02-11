@@ -1,5 +1,5 @@
-github.com/Lenart12/vehicle-command v0.0.0-20250211223038-6948c3358933 h1:+aI83g2BV5CwQqAFZuPf8NDUAPA7gl9FhGq30fkahAM=
-github.com/Lenart12/vehicle-command v0.0.0-20250211223038-6948c3358933/go.mod h1:TUE4TpdW7f82y7cXEEs/RuWWDtcnVFu4Q62solTvRxA=
+github.com/Lenart12/vehicle-command v0.0.0-20250211233450-8e999651b66d h1:ymomtvZhgZAm6eqXEHU5U6IbdjV+HXgp03ewfupqYn4=
+github.com/Lenart12/vehicle-command v0.0.0-20250211233450-8e999651b66d/go.mod h1:TUE4TpdW7f82y7cXEEs/RuWWDtcnVFu4Q62solTvRxA=
 github.com/akamensky/argparse v1.4.0 h1:YGzvsTqCvbEZhL8zZu2AiA5nq805NZh75JNj4ajn1xc=
 github.com/akamensky/argparse v1.4.0/go.mod h1:S5kwC7IuDcEr5VeXtGPRVZ5o/FdhcMlQz4IZQuw64xA=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=

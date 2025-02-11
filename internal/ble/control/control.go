@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -293,11 +292,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 	scanResult, err := ble.ScanVehicleBeacon(scanCtx, firstCommand.Vin)
 	if err != nil {
-		if strings.Contains(err.Error(), "operation not permitted") {
-			// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
-			// heavy-handed way of dealing with devices that are in a bad state.
-			return nil, nil, false, fmt.Errorf("failed to scan for vehicle: %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
-		} else if scanCtx.Err() != nil {
+		if scanCtx.Err() != nil {
 			return nil, nil, false, fmt.Errorf("vehicle not in range: %s", err)
 		} else {
 			return nil, nil, true, fmt.Errorf("failed to scan for vehicle: %s", err)
