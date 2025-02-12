@@ -3,16 +3,12 @@ services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy:latest
     container_name: tesla-ble-http-proxy
+    ports:
+      - "8080:8080"
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus
     restart: always
-    privileged: true
-    network_mode: host
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
     environment: #optional
       logLevel: debug
       httpListenAddress: :8080
-      

@@ -33,7 +33,11 @@ func main() {
 	}
 	err := ble.InitAdapterWithID(btAdapterId)
 	if err != nil {
-		log.Fatal("Failed to initialize Bluetooth adapter:", "err", err)
+		if ble.IsAdapterError(err) {
+			log.Fatal(ble.AdapterErrorHelpMessage(err))
+		} else {
+			log.Fatal("Failed to initialize Bluetooth adapter:", "err", err)
+		}
 	}
 	control.SetupBleControl()
 
