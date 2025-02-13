@@ -374,6 +374,11 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	defer func() { bc.operatedBeacon = nil }()
 
 	handleCommand := func(command *commands.Command) *commands.Command {
+		if command.IsContextDone() {
+			log.Debug("context done, skipping command", "command", command.Command, "body", command.Body)
+			return nil
+		}
+
 		if processIfConnectionStatusCommand(command, command.Vin == firstCommand.Vin) {
 			return nil
 		}
