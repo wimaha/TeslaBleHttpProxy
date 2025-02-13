@@ -94,12 +94,14 @@ func (bc *BleControl) Loop() {
 
 func (bc *BleControl) PushCommand(command commands.Command) {
 	bc.commandStack <- command
+	log.Debug("command pushed", "command", command.Command, "body", command.Body, "stack size", len(bc.commandStack))
 }
 
 func processIfConnectionStatusCommand(command *commands.Command, operated bool) bool {
 	if command.Command != "connection_status" {
 		return false
 	}
+	log.Debug("processing connection_status command", "vin", command.Vin, "operated", operated)
 
 	defer func() {
 		if command.Response.Wait != nil {
@@ -312,7 +314,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	log.Debug("beacon found", "localName", scanResult.LocalName, "addr", scanResult.Address.String(), "rssi", scanResult.RSSI)
 
 	log.Debug("dialing to vehicle ...")
-	conn, err = ble.NewConnectionToBleTarget(ctx, firstCommand.Vin, scanResult)
+	conn, err = ble.NewConnectionFromScanResult(ctx, firstCommand.Vin, scanResult)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 	}
@@ -425,6 +427,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 			if !ok {
 				return nil
 			}
+			log.Debug("command popped", "command", command.Command, "body", command.Body, "stack size", len(bc.commandStack))
 
 			retryCommand := handleCommand(&command)
 			if retryCommand != nil {
