@@ -77,6 +77,17 @@ func (command *Command) Domain() DomainType {
 	}
 }
 
+func (command *Command) IsContextDone() bool {
+	if command.Response == nil {
+		return false
+	}
+	if command.Response.Ctx.Err() != nil {
+		command.Response.Wait.Done()
+		return true
+	}
+	return false
+}
+
 func GetCategory(nameStr string) (vehicle.StateCategory, error) {
 	if category, ok := categoriesByName[strings.ToLower(nameStr)]; ok {
 		return category, nil

@@ -40,13 +40,13 @@ func checkBleControl(response *models.Response) bool {
 	return true
 }
 
-func processCommand(w http.ResponseWriter, r *http.Request, vin string, command_name string, src commands.CommandSourceType, body map[string]interface{}, wait bool) models.Response {
+func processCommand(w http.ResponseWriter, r *http.Request, vin string, command_name string, src commands.CommandSourceType, body map[string]interface{}, wait bool) (models.Response, bool) {
 	var response models.Response
 	response.Vin = vin
 	response.Command = command_name
 
 	if !checkBleControl(&response) {
-		return response
+		return response, true
 	}
 
 	var apiResponse models.ApiResponse
@@ -66,7 +66,17 @@ func processCommand(w http.ResponseWriter, r *http.Request, vin string, command_
 		wg.Add(1)
 		control.BleControlInstance.PushCommand(command)
 
-		wg.Wait()
+		wgDone := make(chan struct{})
+		go func() {
+			defer close(wgDone)
+			wg.Wait()
+		}()
+		select {
+		case <-wgDone:
+		case <-r.Context().Done():
+			log.Info("Request cancelled", "vin", vin, "command", command_name)
+			return response, false
+		}
 
 		SetCacheControl(w, config.AppConfig.CacheMaxAge)
 
@@ -84,7 +94,7 @@ func processCommand(w http.ResponseWriter, r *http.Request, vin string, command_
 		response.Reason = "The command was successfully received and will be processed shortly."
 	}
 
-	return response
+	return response, true
 }
 
 func VehicleCommand(w http.ResponseWriter, r *http.Request) {
@@ -110,8 +120,9 @@ func VehicleCommand(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("received", "command", command, "body", body)
 
-	resp := processCommand(w, r, vin, command, commands.CommandSource.FleetVehicleCommands, body, wait)
-	writeResponseWithStatus(w, &resp)
+	if resp, ok := processCommand(w, r, vin, command, commands.CommandSource.FleetVehicleCommands, body, wait); ok {
+		writeResponseWithStatus(w, &resp)
+	}
 }
 
 func VehicleEndpoint(w http.ResponseWriter, r *http.Request) {
@@ -170,8 +181,9 @@ func VehicleEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("received", "command", command, "body", body)
-	resp := processCommand(w, r, vin, command, src, body, wait)
-	writeResponseWithStatus(w, &resp)
+	if resp, ok := processCommand(w, r, vin, command, src, body, wait); ok {
+		writeResponseWithStatus(w, &resp)
+	}
 }
 
 func ProxyCommand(w http.ResponseWriter, r *http.Request) {
@@ -190,8 +202,9 @@ func ProxyCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("received", "command", command)
-	resp := processCommand(w, r, vin, command, commands.CommandSource.TeslaBleHttpProxy, nil, true)
-	writeResponseWithStatus(w, &resp)
+	if resp, ok := processCommand(w, r, vin, command, commands.CommandSource.TeslaBleHttpProxy, nil, true); ok {
+		writeResponseWithStatus(w, &resp)
+	}
 }
 
 func ShowRequest(r *http.Request, handler string) {

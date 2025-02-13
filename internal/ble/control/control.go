@@ -68,14 +68,24 @@ func (bc *BleControl) Loop() {
 		} else {
 			log.Debug("waiting for command")
 			// Wait for the next command
-			select {
-			case command, ok := <-bc.providerStack:
-				if ok {
-					retryCommand = bc.connectToVehicleAndOperateConnection(&command)
-				}
-			case command, ok := <-bc.commandStack:
-				if ok {
-					retryCommand = bc.connectToVehicleAndOperateConnection(&command)
+		outer:
+			for {
+				select {
+				case command, ok := <-bc.providerStack:
+					if ok {
+						retryCommand = bc.connectToVehicleAndOperateConnection(&command)
+					}
+					break outer
+				case command, ok := <-bc.commandStack:
+					if ok {
+						log.Debug("command popped", "command", command.Command, "body", command.Body, "stack size", len(bc.commandStack))
+						if command.IsContextDone() {
+							log.Debug("context done, skipping command", "command", command.Command, "body", command.Body)
+							continue
+						}
+						retryCommand = bc.connectToVehicleAndOperateConnection(&command)
+					}
+					break outer
 				}
 			}
 		}
