@@ -61,11 +61,22 @@ func NewBleControl() (*BleControl, error) {
 func (bc *BleControl) Loop() {
 	var retryCommand *commands.Command
 	for {
-		time.Sleep(1 * time.Second)
 		if retryCommand != nil {
 			log.Debug("retrying command from loop", "command", retryCommand.Command, "body", retryCommand.Body)
+			if retryCommand.Response != nil {
+				select {
+				case <-retryCommand.Response.Ctx.Done():
+					log.Debug("context done, skipping command", "command", retryCommand.Command, "body", retryCommand.Body)
+					retryCommand = nil
+					continue
+				case <-time.After(1 * time.Second):
+				}
+			} else {
+				time.Sleep(1 * time.Second)
+			}
 			retryCommand = bc.connectToVehicleAndOperateConnection(retryCommand)
 		} else {
+			time.Sleep(1 * time.Second)
 			log.Debug("waiting for command")
 			// Wait for the next command
 		outer:
