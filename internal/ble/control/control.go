@@ -126,6 +126,7 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 
 	defer func() {
 		if retry {
+			log.Warn("retrying connection_status", "err", err)
 			command.TotalRetries++
 			if command.TotalRetries >= 3 {
 				log.Warn("max retries reached for connection_status")
@@ -339,6 +340,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		if scanCtx.Err() != nil {
 			return nil, nil, false, fmt.Errorf("vehicle not in range: %s", err)
 		} else if strings.Contains(err.Error(), "Resource Not Ready") {
+			log.Debug("Adapter is not ready, try powering it on")
 			// This happens if adapter is powered off, or restarting. We should retry.
 			return nil, nil, true, fmt.Errorf("bluetooth adapter not available")
 		} else {
