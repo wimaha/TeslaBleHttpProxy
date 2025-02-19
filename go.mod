@@ -38,4 +38,4 @@ require (
 )
 
 // Replace untill https://github.com/teslamotors/vehicle-command/pull/373 is merged
-replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250213191938-11283fd6f653
+replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250219194759-e166ac6890e0

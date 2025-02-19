@@ -338,6 +338,9 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	if err != nil {
 		if scanCtx.Err() != nil {
 			return nil, nil, false, fmt.Errorf("vehicle not in range: %s", err)
+		} else if strings.Contains(err.Error(), "Resource Not Ready") {
+			// This happens if adapter is powered off, or restarting. We should retry.
+			return nil, nil, true, fmt.Errorf("bluetooth adapter not available")
 		} else {
 			return nil, nil, true, fmt.Errorf("failed to scan for vehicle: %s", err)
 		}
