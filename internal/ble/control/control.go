@@ -108,22 +108,39 @@ func (bc *BleControl) PushCommand(command commands.Command) {
 	log.Debug("command pushed", "command", command.Command, "body", command.Body, "stack size", len(bc.commandStack))
 }
 
-func processIfConnectionStatusCommand(command *commands.Command, operated bool) bool {
+func processIfConnectionStatusCommand(command *commands.Command, operated bool) (accepted bool, retry bool) {
 	if command.Command != "connection_status" {
-		return false
+		return false, false
 	}
+	accepted = true
+	retry = true
 	log.Debug("processing connection_status command", "vin", command.Vin, "operated", operated)
 
 	defer func() {
-		if command.Response.Wait != nil {
+		if command.Response != nil && !retry {
 			command.Response.Wait.Done()
+		}
+	}()
+
+	var err error
+
+	defer func() {
+		if retry {
+			command.TotalRetries++
+			if command.TotalRetries >= 3 {
+				log.Warn("max retries reached for connection_status")
+				retry = false
+				command.Response.Error = fmt.Sprintf("failed to get connection status after 3 retries: %v", err)
+				command.Response.Result = false
+			}
 		}
 	}()
 
 	if BleControlInstance == nil {
 		command.Response.Error = "BleControl is not initialized. Maybe private.pem is missing."
 		command.Response.Result = false
-		return true
+		retry = false
+		return
 	} else {
 		command.Response.Result = true
 	}
@@ -137,7 +154,6 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 			log.Warn("operated beacon is nil but operated is true")
 		}
 	} else {
-		var err error
 		scanTimeout := config.AppConfig.ScanTimeout
 		scanCtx, cancelScan := context.WithCancel(command.Response.Ctx)
 		if scanTimeout > 0 {
@@ -148,7 +164,7 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 		if err != nil && !strings.Contains(err.Error(), "context deadline exceeded") {
 			command.Response.Error = err.Error()
 			command.Response.Result = false
-			return true
+			return
 		}
 	}
 
@@ -179,12 +195,17 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 		command.Response.Response = json.RawMessage(respBytes)
 	}
 
-	return true
+	retry = false
+	return
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
-	if processIfConnectionStatusCommand(firstCommand, false) {
-		return nil
+	if accepted, retry := processIfConnectionStatusCommand(firstCommand, false); accepted {
+		if retry {
+			return firstCommand
+		} else {
+			return nil
+		}
 	}
 
 	log.Info("connecting to Vehicle ...")
@@ -390,8 +411,12 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 			return nil
 		}
 
-		if processIfConnectionStatusCommand(command, command.Vin == firstCommand.Vin) {
-			return nil
+		if accepted, retry := processIfConnectionStatusCommand(command, command.Vin == firstCommand.Vin); accepted {
+			if retry {
+				return command
+			} else {
+				return nil
+			}
 		}
 
 		//If new VIN, close connection
