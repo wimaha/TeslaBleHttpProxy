@@ -27,15 +27,15 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/saltosystems/winrt-go v0.0.0-20240509164145-4f7860a3bd2b // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/soypat/cyw43439 v0.0.0-20241116210509-ae1ce0e084c5 // indirect
+	github.com/soypat/cyw43439 v0.0.0-20250222151126-af3e63a269de // indirect
 	github.com/soypat/seqs v0.0.0-20240527012110-1201bab640ef // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/tinygo-org/cbgo v0.0.4 // indirect
 	github.com/tinygo-org/pio v0.0.0-20231216154340-cd888eb58899 // indirect
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/sys v0.24.0 // indirect
-	tinygo.org/x/bluetooth v0.11.0 // indirect
+	tinygo.org/x/bluetooth v0.11.1-0.20250225202609-5befb38cd8f0 // indirect
 )
 
 // Replace untill https://github.com/teslamotors/vehicle-command/pull/373 is merged
-replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250219194759-e166ac6890e0
+replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250225204453-0aafe212c502
