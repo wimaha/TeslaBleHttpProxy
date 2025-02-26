@@ -119,6 +119,7 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 	defer func() {
 		if command.Response != nil && !retry {
 			command.Response.Wait.Done()
+			log.Info("successfully executed", "command", command.Command, "body", command.Body)
 		}
 	}()
 
