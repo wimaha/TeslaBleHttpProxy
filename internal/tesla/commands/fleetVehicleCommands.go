@@ -14,6 +14,16 @@ import (
 
 type commandArgs map[string]interface{}
 
+var dayNamesBitMask = map[string]int32{
+	"sun": 1,
+	"mon": 2,
+	"tue": 4,
+	"wed": 8,
+	"thu": 16,
+	"fri": 32,
+	"sat": 64,
+}
+
 func (args commandArgs) validateString(key string, required bool) (string, error) {
 	if _, ok := args[key]; !ok {
 		if required {
@@ -95,6 +105,34 @@ func (args commandArgs) optInt(key string, def int) int {
 	}
 	return def
 }
+func (args commandArgs) validateUint64(key string, required bool) (uint64, error) {
+	if _, ok := args[key]; !ok {
+		if required {
+			return 0, fmt.Errorf("missing '%s' in request body", key)
+		} else {
+			return 0, nil
+		}
+	}
+	value, ok := args[key].(uint64)
+	if !ok {
+		if value, ok := args[key].(float64); ok {
+			// Ensure that the float is actually a unit64
+			if value != math.Trunc(value) || value < 0 || value > math.MaxUint64 || math.IsNaN(value) {
+				return 0, fmt.Errorf("expected '%s' to be a uint64", key)
+			}
+			args[key] = uint64(value)
+			return uint64(value), nil
+		}
+		return 0, fmt.Errorf("expected '%s' to be a uint64", key)
+	}
+	return value, nil
+}
+func (args commandArgs) optUint64(key string, def uint64) uint64 {
+	if value, ok := args[key].(uint64); ok {
+		return value
+	}
+	return def
+}
 func (args commandArgs) validateFloat(key string, required bool) (float64, error) {
 	if _, ok := args[key]; !ok {
 		if required {
@@ -126,6 +164,23 @@ func (args commandArgs) optFloat(key string, def float64) float64 {
 		return value
 	}
 	return def
+}
+func (args commandArgs) validateLatLong(latKey string, longKey string, required bool) (float64, float64, error) {
+	lat, err := args.validateFloat(latKey, required)
+	if err != nil {
+		return 0, 0, err
+	}
+	if lat < -90 || lat > 90 {
+		return 0, 0, fmt.Errorf("invalid 'lat' value: %f", lat)
+	}
+	long, err := args.validateFloat(longKey, required)
+	if err != nil {
+		return 0, 0, err
+	}
+	if long < -180 || long > 180 {
+		return 0, 0, fmt.Errorf("invalid 'long' value: %f", long)
+	}
+	return lat, long, nil
 }
 
 type fleetVehicleCommandHandler struct {
@@ -176,8 +231,73 @@ var fleetVehicleCommands = map[string]fleetVehicleCommandHandler{
 	},
 	"add_charge_schedule": {
 		validate: func(args commandArgs) error {
-			// TODO: implement
-			return fmt.Errorf("not implemented")
+			if _, err := args.validateUint64("id", false); err != nil {
+				return err
+			}
+
+			daysList, err := args.validateString("days_of_week", true)
+			if err != nil {
+				return err
+			}
+			if daysList != "" {
+				for _, day := range strings.Split(daysList, ",") {
+					if _, ok := dayNamesBitMask[strings.TrimSpace(strings.ToLower(day))]; !ok {
+						return fmt.Errorf("invalid 'days_of_week' value: %s", day)
+					}
+				}
+			}
+
+			if _, err := args.validateInt("start_time", false); err != nil {
+				return err
+			}
+
+			if _, err := args.validateInt("end_time", false); err != nil {
+				return err
+			}
+
+			if _, err := args.validateBool("one_time", false); err != nil {
+				return err
+			}
+
+			if _, err := args.validateBool("enabled", false); err != nil {
+				return err
+			}
+
+			if _, _, err := args.validateLatLong("latitude", "longitude", true); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		execute: func(ctx context.Context, car *vehicle.Vehicle, args commandArgs) error {
+			// Note that vehicle-command does not set Name
+			schedule := vehicle.ChargeSchedule{
+				Id:        args.optUint64("id", uint64(time.Now().Unix())),
+				OneTime:   args.optBool("one_time", false),
+				Enabled:   args.optBool("enabled", false),
+				Latitude:  args.float32("latitude"),
+				Longitude: args.float32("longitude"),
+			}
+
+			var daysMask int32
+			for _, day := range strings.Split(args.str("days_of_week"), ",") {
+				if v, ok := dayNamesBitMask[strings.TrimSpace(strings.ToLower(day))]; ok {
+					daysMask |= v
+				}
+			}
+			schedule.DaysOfWeek = daysMask
+
+			if args["start_time"] != nil {
+				schedule.StartEnabled = true
+				schedule.StartTime = int32(args.int("start_time"))
+			}
+
+			if args["end_time"] != nil {
+				schedule.EndEnabled = true
+				schedule.EndTime = int32(args.int("end_time"))
+			}
+
+			return car.AddChargeSchedule(ctx, &schedule)
 		},
 	},
 	"add_precondition_schedule": {
@@ -812,25 +932,13 @@ var fleetVehicleCommands = map[string]fleetVehicleCommandHandler{
 	},
 	"trigger_homelink": {
 		validate: func(args commandArgs) error {
-			lat, err := args.validateFloat("lat", false)
-			if err != nil {
+			if _, _, err := args.validateLatLong("lat", "lon", false); err != nil {
 				return err
-			}
-			if lat < -90 || lat > 90 {
-				return fmt.Errorf("invalid 'lat' value: %f", lat)
-			}
-
-			lon, err := args.validateFloat("lon", false)
-			if err != nil {
-				return err
-			}
-			if lon < -180 || lon > 180 {
-				return fmt.Errorf("invalid 'lon' value: %f", lon)
 			}
 
 			// Official API requires token, but it's not needed here
 			// so we just validate it for completeness and to avoid errors
-			if _, ok := args.validateString("token", false); ok != nil {
+			if _, err := args.validateString("token", false); err != nil {
 				return err
 			}
 
@@ -857,10 +965,7 @@ var fleetVehicleCommands = map[string]fleetVehicleCommandHandler{
 			}
 			// In actuallity, the lat and lon values are not required for any operation
 			// but we still validate them here for completeness and to avoid errors
-			if _, err := args.validateFloat("lat", false); err != nil {
-				return err
-			}
-			if _, err := args.validateFloat("lon", false); err != nil {
+			if _, _, err := args.validateLatLong("lat", "lon", false); err != nil {
 				return err
 			}
 			switch state {
