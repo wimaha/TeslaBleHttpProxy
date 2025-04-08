@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/akamensky/argparse"
 	"github.com/charmbracelet/log"
@@ -20,7 +19,6 @@ type Config struct {
 	CacheMaxAge       int    // Seconds to cache BLE responses
 	DashboardBaseURL  string // Base URL for proxying dashboard (Useful if the proxy is behind a reverse proxy)
 	ApiBaseUrl        string // Base URL for proxying BLE commands (Useful if the proxy is behind a reverse proxy)
-	BtAdapterID       string // The Bluetooth adapter to use
 }
 
 var AppConfig *Config
@@ -58,12 +56,6 @@ func LoadConfig() *Config {
 	}})
 	dashboardBaseUrl := parser.String("d", "dashboardBaseUrl", &argparse.Options{Help: "Base URL for dashboard (Useful if the proxy is behind a reverse proxy)", Default: ""})
 	apiBaseUrl := parser.String("a", "apiBaseUrl", &argparse.Options{Help: "Base URL for proxying API commands", Default: ""})
-	btAdapterID := parser.String("B", "btAdapter", &argparse.Options{Help: "Bluetooth adapter ID to use (\"hciX\")", Default: "Default adapter", Validate: func(args []string) error {
-		if !strings.HasPrefix(args[0], "hci") {
-			return fmt.Errorf("invalid Bluetooth adapter ID (must start with 'hci')")
-		}
-		return nil
-	}})
 	// Inject environment variables as command line arguments
 	args := os.Args
 	for _, arg := range parser.GetArgs() {
@@ -91,7 +83,6 @@ func LoadConfig() *Config {
 		CacheMaxAge:       *cacheMaxAge,
 		DashboardBaseURL:  *dashboardBaseUrl,
 		ApiBaseUrl:        *apiBaseUrl,
-		BtAdapterID:       *btAdapterID,
 	}
 }
 

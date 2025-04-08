@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/charmbracelet/log"
-	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/routes"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
@@ -26,19 +25,6 @@ func main() {
 	level, _ := log.ParseLevel(config.AppConfig.LogLevel)
 	log.SetLevel(level)
 
-	btAdapterId := ""
-	if config.AppConfig.BtAdapterID != "Default adapter" {
-		btAdapterId = config.AppConfig.BtAdapterID
-		log.Debug("Using Bluetooth adapter:", "adapter", btAdapterId)
-	}
-	err := ble.InitAdapterWithID(btAdapterId)
-	if err != nil {
-		if ble.IsAdapterError(err) {
-			log.Fatal(ble.AdapterErrorHelpMessage(err))
-		} else {
-			log.Fatal("Failed to initialize Bluetooth adapter:", "err", err)
-		}
-	}
 	control.SetupBleControl()
 
 	router := routes.SetupRoutes(static, html)

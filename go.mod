@@ -7,35 +7,30 @@ require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/pkg/errors v0.9.1
-	github.com/teslamotors/vehicle-command v0.3.3-0.20250128004836-ebad42aaa852
+	github.com/teslamotors/vehicle-command v0.3.4-0.20250319174413-00e3294e31d0
 	google.golang.org/protobuf v1.34.2
 )
 
 require (
+	github.com/JuulLabs-OSS/cbgo v0.0.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/charmbracelet/lipgloss v0.12.1 // indirect
 	github.com/charmbracelet/x/ansi v0.1.4 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
+	github.com/go-ble/ble v0.0.0-20240122180141-8c5522f54333 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
+	github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b // indirect
+	github.com/mgutz/logxi v0.0.0-20161027140823-aebf8a7d67ab // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
+	github.com/raff/goble v0.0.0-20190909174656-72afc67d6a99 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
-	github.com/saltosystems/winrt-go v0.0.0-20240509164145-4f7860a3bd2b // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/soypat/cyw43439 v0.0.0-20250222151126-af3e63a269de // indirect
-	github.com/soypat/seqs v0.0.0-20240527012110-1201bab640ef // indirect
 	github.com/stretchr/testify v1.10.0 // indirect
-	github.com/tinygo-org/cbgo v0.0.4 // indirect
-	github.com/tinygo-org/pio v0.0.0-20231216154340-cd888eb58899 // indirect
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/sys v0.24.0 // indirect
-	tinygo.org/x/bluetooth v0.11.1-0.20250225202609-5befb38cd8f0 // indirect
 )
-
-// Replace untill https://github.com/teslamotors/vehicle-command/pull/373 is merged
-replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250225204453-0aafe212c502

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -35,7 +36,7 @@ func CloseBleControl() {
 
 type BleControl struct {
 	privateKey          protocol.ECDHPrivateKey
-	operatedBeacon      *ble.ScanResult
+	operatedBeacon      *ble.Advertisement
 	connectionStart     time.Time
 	infotainmentSession bool
 
@@ -148,11 +149,11 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 		command.Response.Result = true
 	}
 
-	var beacon *ble.ScanResult = nil
+	var beacon ble.Advertisement = nil
 
 	if operated {
 		if BleControlInstance.operatedBeacon != nil {
-			beacon = BleControlInstance.operatedBeacon
+			beacon = *BleControlInstance.operatedBeacon
 		} else {
 			log.Warn("operated beacon is nil but operated is true")
 		}
@@ -174,10 +175,10 @@ func processIfConnectionStatusCommand(command *commands.Command, operated bool) 
 	var resp map[string]interface{}
 	if beacon != nil {
 		resp = map[string]interface{}{
-			"local_name":  beacon.LocalName,
+			"local_name":  beacon.LocalName(),
 			"connectable": true,
-			"address":     beacon.Address.String(),
-			"rssi":        beacon.RSSI,
+			"address":     beacon.Addr().String(),
+			"rssi":        beacon.RSSI(),
 			"operated":    operated,
 		}
 	} else {
@@ -341,20 +342,20 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	if err != nil {
 		if scanCtx.Err() != nil {
 			return nil, nil, false, fmt.Errorf("vehicle not in range: %s", err)
-		} else if strings.Contains(err.Error(), "Resource Not Ready") {
-			log.Debug("Adapter is not ready, try powering it on")
-			// This happens if adapter is powered off, or restarting. We should retry.
-			return nil, nil, true, fmt.Errorf("bluetooth adapter not available")
+		} else if strings.Contains(err.Error(), "operation not permitted") {
+			// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
+			// heavy-handed way of dealing with devices that are in a bad state.
+			return nil, nil, false, fmt.Errorf("failed to scan for vehicle: %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
 		} else {
 			return nil, nil, true, fmt.Errorf("failed to scan for vehicle: %s", err)
 		}
 	}
 
-	log.Debug("beacon found", "localName", scanResult.LocalName, "addr", scanResult.Address.String(), "rssi", scanResult.RSSI)
+	log.Debug("beacon found", "localName", scanResult.LocalName, "addr", scanResult.Addr().String(), "rssi", scanResult.RSSI)
 
 	log.Debug("connect to vehicle ...")
 	bc.connectionStart = time.Now()
-	conn, err = ble.NewConnectionFromScanResult(ctx, firstCommand.Vin, scanResult)
+	conn, err = ble.NewConnectionToBleTarget(ctx, firstCommand.Vin, scanResult)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 	}
@@ -398,7 +399,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		log.Info("Key-Request connection established")
 	}
 
-	bc.operatedBeacon = scanResult
+	bc.operatedBeacon = &scanResult
 
 	// everything fine
 	shouldDefer = false

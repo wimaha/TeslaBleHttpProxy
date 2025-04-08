@@ -37,17 +37,18 @@ services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy
     container_name: tesla-ble-http-proxy
-    ports:
-      - "8080:8080"  # Expose HTTP server port
     environment:
       - cacheMaxAge=5 # Optional, but recommended to set this to anything more than 0 if you are using the vehicle data
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus
     restart: always
+    privileged: true
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
 ```
-
-Before running the proxy make sure that bluez and dbus is installed on the host (`sudo apt install bluez dbus`).
 
 Please remember to create an empty folder where the keys can be stored later. In this example, it is `~/TeslaBleHttpProxy/key`.
 
