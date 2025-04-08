@@ -36,6 +36,7 @@ func CloseBleControl() {
 type BleControl struct {
 	privateKey          protocol.ECDHPrivateKey
 	operatedBeacon      *ble.ScanResult
+	connectionStart     time.Time
 	infotainmentSession bool
 
 	commandStack  chan commands.Command
@@ -351,7 +352,8 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 	log.Debug("beacon found", "localName", scanResult.LocalName, "addr", scanResult.Address.String(), "rssi", scanResult.RSSI)
 
-	log.Debug("dialing to vehicle ...")
+	log.Debug("connect to vehicle ...")
+	bc.connectionStart = time.Now()
 	conn, err = ble.NewConnectionFromScanResult(ctx, firstCommand.Vin, scanResult)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
@@ -406,7 +408,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
 	log.Debug("operating connection ...")
 	defer log.Debug("operating connection done")
-	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
+	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second-time.Since(bc.connectionStart)) // 29 seconds to be safe
 	defer cancel()
 
 	defer func() { bc.operatedBeacon = nil }()
