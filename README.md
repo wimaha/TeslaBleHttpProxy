@@ -67,7 +67,7 @@ usage: TeslaBleHttpProxy [-h|--help] [-l|--logLevel "<value>"]
                          [-b|--httpListenAddress "<value>"] [-s|--scanTimeout
                          <integer>] [-c|--cacheMaxAge <integer>] [-k|--keys
                          "<value>"] [-d|--dashboardBaseUrl "<value>"]
-                         [-a|--apiBaseUrl "<value>"]
+                         [-a|--apiBaseUrl "<value>"] [-B|--btAdapter "<value>"]
 
                          Proxy for Tesla BLE commands over HTTP
 
@@ -85,6 +85,8 @@ Arguments:
   -d  --dashboardBaseUrl   Base URL for dashboard (Useful if the proxy is
                            behind a reverse proxy). Default: 
   -a  --apiBaseUrl         Base URL for proxying API commands. Default: 
+  -B  --btAdapter          Bluetooth adapter ID to use ("hciX"). Default:
+                           Default adapter
 ```
 
 Please remember to create an empty folder called `key` where the keys can be stored later.

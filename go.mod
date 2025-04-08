@@ -7,7 +7,7 @@ require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/pkg/errors v0.9.1
-	github.com/teslamotors/vehicle-command v0.3.4-0.20250319174413-00e3294e31d0
+	github.com/teslamotors/vehicle-command v0.3.3-0.20250128004836-ebad42aaa852
 	google.golang.org/protobuf v1.34.2
 )
 
@@ -34,3 +34,6 @@ require (
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/sys v0.24.0 // indirect
 )
+
+// Replace untill https://github.com/teslamotors/vehicle-command/pull/389 is merged
+replace github.com/teslamotors/vehicle-command => github.com/Lenart12/vehicle-command v0.0.0-20250408204208-fc7cf157a7af
