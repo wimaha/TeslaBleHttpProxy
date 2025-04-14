@@ -432,6 +432,11 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 		cmd, err := bc.ExecuteCommand(car, command, connectionCtx)
 
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				log.Info("command canceled", "command", command.Command, "body", command.Body)
+				return nil
+			}
+
 			if command.TotalRetries >= 3 {
 				log.Error("failed to execute command after 3 retries", "command", command.Command, "body", command.Body, "error", err.Error())
 				return nil
@@ -533,14 +538,16 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 	dontSkipWait := false
 	for ; command.TotalRetries < retryCount; command.TotalRetries++ {
 		if dontSkipWait {
-			log.Warn(lastErr)
-			log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
+			if !errors.Is(ctx.Err(), context.Canceled) {
+				log.Warn(lastErr)
+				log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
+			}
 			select {
 			case <-time.After(sleep):
 			case <-ctx.Done():
 				if connectionCtx.Err() != nil {
 					log.Debug("operated connection expired")
-					return command, errors.Wrap(ctx.Err(), "operated connection expired")
+					return command, errors.Wrap(connectionCtx.Err(), "operated connection expired")
 				}
 				return nil, ctx.Err()
 			}
