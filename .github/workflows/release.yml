@@ -9,7 +9,7 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  release:
+  build_release:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,7 +48,7 @@ jobs:
 
       - name: Build binaries
         run: |
-          RELEASE_VERSION=${{ github.event.release.tag_name }}${{ matrix.tag_suffix }}
+          RELEASE_VERSION=${{ github.ref_name }}${{ matrix.tag_suffix }}
           GOOS=linux GOARCH=amd64 go build -o dist/TeslaBleHttpProxy-linux-amd64${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
           GOOS=linux GOARCH=arm64 go build -o dist/TeslaBleHttpProxy-linux-arm64${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
           GOOS=linux GOARCH=arm GOARM=7 go build -o dist/TeslaBleHttpProxy-linux-armv7${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
@@ -57,7 +57,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}{{ matrix.tag_suffix }}
+          images: ${{ env.REGISTRY }}/${{ github.repository }}
           tags: |
             type=ref,event=branch
             type=sha,format=short
@@ -70,13 +70,35 @@ jobs:
         with:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            APPVERSION=${{ github.event.release.tag_name }}${{ matrix.tag_suffix }}
+            APPVERSION=${{ github.ref_name }}${{ matrix.tag_suffix }}
+
+      - name: Upload binaries
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ github.ref_name }}${{ matrix.tag_suffix }}
+          path: dist
+
+  create_release:
+    runs-on: ubuntu-latest
+    needs: build_release
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: binaries-${{ github.ref_name }}*
+          merge-multiple: true
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
