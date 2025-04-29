@@ -30,6 +30,11 @@ jobs:
         with:
           ref: ${{ matrix.branch }}
 
+      - name: Get SHA
+        id: sha
+        run: |
+          echo "sha=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -59,13 +64,14 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}
+          flavor: |
+            latest=false
           tags: |
-            type=ref,event=branch
-            type=sha,format=short
-            type=semver,pattern={{version}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
-            type=semver,pattern={{major}}.{{minor}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
-            type=semver,pattern={{major}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
-            type=raw,value=latest${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=${{ steps.sha.outputs.sha }}
+            type=raw,value=latest${{ matrix.tag_suffix }}
+            type=semver,pattern={{version}}${{ matrix.tag_suffix }}
+            type=semver,pattern={{major}}.{{minor}}${{ matrix.tag_suffix }}
+            type=semver,pattern={{major}}${{ matrix.tag_suffix }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
