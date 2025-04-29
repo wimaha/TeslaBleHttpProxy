@@ -52,6 +52,7 @@ jobs:
           GOOS=linux GOARCH=amd64 go build -o dist/TeslaBleHttpProxy-linux-amd64${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
           GOOS=linux GOARCH=arm64 go build -o dist/TeslaBleHttpProxy-linux-arm64${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
           GOOS=linux GOARCH=arm GOARM=7 go build -o dist/TeslaBleHttpProxy-linux-armv7${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
+          GOOS=linux GOARCH=arm GOARM=6 go build -o dist/TeslaBleHttpProxy-linux-armv6${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
 
       - name: Extract Docker metadata
         id: meta
@@ -70,7 +71,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
