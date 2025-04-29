@@ -63,6 +63,7 @@ jobs:
             type=sha,format=short
             type=semver,pattern={{version}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{major}}.{{minor}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
             type=raw,value=latest${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
 
       - name: Build and push Docker image
