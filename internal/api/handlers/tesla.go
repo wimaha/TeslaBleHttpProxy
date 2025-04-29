@@ -1,14 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/gorilla/mux"
@@ -18,7 +15,7 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
-func commonDefer(w http.ResponseWriter, response *models.Response) {
+func writeResponseWithStatus(w http.ResponseWriter, response *models.Response) {
 	var ret models.Ret
 	ret.Response = *response
 
@@ -43,49 +40,45 @@ func checkBleControl(response *models.Response) bool {
 	return true
 }
 
-func Command(w http.ResponseWriter, r *http.Request) {
-	ShowRequest(r, "Command")
-	params := mux.Vars(r)
-	vin := params["vin"]
-	command := params["command"]
-
-	wait := r.URL.Query().Get("wait") == "true"
-
+func processCommand(w http.ResponseWriter, r *http.Request, vin string, command_name string, src commands.CommandSourceType, body map[string]interface{}, wait bool) (models.Response, bool) {
 	var response models.Response
 	response.Vin = vin
-	response.Command = command
-
-	defer commonDefer(w, &response)
+	response.Command = command_name
 
 	if !checkBleControl(&response) {
-		return
+		return response, true
 	}
 
-	//Body
-	var body map[string]interface{} = nil
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
-		log.Error("decoding body", "err", err)
-	}
-
-	log.Info("received", "command", command, "body", body)
-
-	if !slices.Contains(commands.ExceptedCommands, command) {
-		log.Error("not supported", "command", command)
-		response.Reason = fmt.Sprintf("The command \"%s\" is not supported.", command)
-		response.Result = false
-		return
+	var apiResponse models.ApiResponse
+	command := commands.Command{
+		Command: command_name,
+		Source:  src,
+		Vin:     vin,
+		Body:    body,
 	}
 
 	if wait {
-		var apiResponse models.ApiResponse
 		wg := sync.WaitGroup{}
+		command.Response = &apiResponse
 		apiResponse.Wait = &wg
 		apiResponse.Ctx = r.Context()
 
 		wg.Add(1)
-		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse)
+		control.BleControlInstance.PushCommand(command)
 
-		wg.Wait()
+		wgDone := make(chan struct{})
+		go func() {
+			defer close(wgDone)
+			wg.Wait()
+		}()
+		select {
+		case <-wgDone:
+		case <-r.Context().Done():
+			log.Info("Request cancelled", "vin", vin, "command", command_name)
+			return response, false
+		}
+
+		SetCacheControl(w, config.AppConfig.CacheMaxAge)
 
 		if apiResponse.Result {
 			response.Result = true
@@ -95,123 +88,122 @@ func Command(w http.ResponseWriter, r *http.Request) {
 			response.Result = false
 			response.Reason = apiResponse.Error
 		}
-		return
-	}
-
-	control.BleControlInstance.PushCommand(command, vin, body, nil)
-	response.Result = true
-	response.Reason = "The command was successfully received and will be processed shortly."
-}
-
-func VehicleData(w http.ResponseWriter, r *http.Request) {
-	ShowRequest(r, "VehicleData")
-	params := mux.Vars(r)
-	vin := params["vin"]
-	command := "vehicle_data"
-
-	var endpoints []string
-	endpointsString := r.URL.Query().Get("endpoints")
-	if endpointsString != "" {
-		endpoints = strings.Split(endpointsString, ";")
 	} else {
-		endpoints = []string{"charge_state", "climate_state"} //'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
-	}
-
-	var response models.Response
-	response.Vin = vin
-	response.Command = command
-
-	for _, endpoint := range endpoints {
-		if !slices.Contains(commands.ExceptedEndpoints, endpoint) {
-			log.Error("not supported", "endpoint", endpoint)
-			response.Reason = fmt.Sprintf("The endpoint \"%s\" is not supported.", endpoint)
-			response.Result = false
-			return
-		}
-	}
-
-	defer commonDefer(w, &response)
-
-	if !checkBleControl(&response) {
-		return
-	}
-
-	var apiResponse models.ApiResponse
-	wg := sync.WaitGroup{}
-	apiResponse.Wait = &wg
-	apiResponse.Ctx = r.Context()
-
-	wg.Add(1)
-	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
-
-	wg.Wait()
-
-	SetCacheControl(w, config.AppConfig.CacheMaxAge)
-
-	if apiResponse.Result {
+		control.BleControlInstance.PushCommand(command)
 		response.Result = true
-		response.Reason = "The request was successfully processed."
-		response.Response = apiResponse.Response
-	} else {
-		response.Result = false
-		response.Reason = apiResponse.Error
+		response.Reason = "The command was successfully received and will be processed shortly."
 	}
+
+	return response, true
 }
 
-func BodyControllerState(w http.ResponseWriter, r *http.Request) {
-	ShowRequest(r, "BodyControllerState")
+func VehicleCommand(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "Command")
 	params := mux.Vars(r)
 	vin := params["vin"]
+	command := params["command"]
 
-	var response models.Response
-	response.Vin = vin
-	response.Command = "body-controller-state"
+	wait := r.URL.Query().Get("wait") == "true"
 
-	defer commonDefer(w, &response)
+	var body map[string]interface{} = nil
 
-	if !checkBleControl(&response) {
+	// Check if the body is empty
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		log.Debug("decoding body", "err", err)
+		// If json fails we try to validate anyways
+	}
+
+	if err := commands.ValidateFleetVehicleCommand(command, body); err != nil {
+		writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: err.Error()})
 		return
 	}
 
-	var apiResponse models.ApiResponse
+	log.Info("received", "command", command, "body", body)
 
-	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	apiResponse.Ctx = ctx
-	defer cancel()
-	cmd := &commands.Command{
-		Command:  "body-controller-state",
-		Domain:   commands.Domain.VCSEC,
-		Vin:      vin,
-		Response: &apiResponse,
+	if resp, ok := processCommand(w, r, vin, command, commands.CommandSource.FleetVehicleCommands, body, wait); ok {
+		writeResponseWithStatus(w, &resp)
 	}
-	conn, car, _, err := control.BleControlInstance.TryConnectToVehicle(ctx, cmd)
-	if err == nil {
-		//Successful
-		defer conn.Close()
-		defer log.Debug("close connection (A)")
-		defer car.Disconnect()
-		defer log.Debug("disconnect vehicle (A)")
+}
 
-		_, err, _ := control.BleControlInstance.ExecuteCommand(car, cmd, context.Background())
-		if err != nil {
-			response.Result = false
-			response.Reason = err.Error()
+func VehicleEndpoint(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "VehicleEndpoint")
+	params := mux.Vars(r)
+	vin := params["vin"]
+	command := params["command"]
+
+	var body map[string]interface{} = nil
+
+	src := commands.CommandSource.FleetVehicleEndpoint
+	wait := true
+
+	checkMethod := func(expected string) bool {
+		if r.Method != expected {
+			writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: "Invalid method: " + r.Method})
+			return false
+		}
+		return true
+	}
+
+	switch command {
+	case "wake_up":
+		if !checkMethod("POST") {
 			return
 		}
-
-		SetCacheControl(w, config.AppConfig.CacheMaxAge)
-
-		if apiResponse.Result {
-			response.Result = true
-			response.Reason = "The request was successfully processed."
-			response.Response = apiResponse.Response
-		} else {
-			response.Result = false
-			response.Reason = apiResponse.Error
+		wait = r.URL.Query().Get("wait") == "true"
+	case "vehicle_data":
+		if !checkMethod("GET") {
+			return
 		}
-	} else {
-		response.Result = false
-		response.Reason = err.Error()
+		var endpoints []string
+		endpointsString := r.URL.Query().Get("endpoints")
+		if endpointsString != "" {
+			endpoints = strings.Split(endpointsString, ";")
+		} else {
+			// 'charge_state', 'climate_state', 'closures_state',
+			// 'drive_state', 'gui_settings', 'location_data',
+			// 'charge_schedule_data', 'preconditioning_schedule_data',
+			// 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
+			endpoints = []string{"charge_state", "climate_state"}
+		}
+
+		// Ensure that the endpoints are valid
+		for _, endpoint := range endpoints {
+			if _, err := commands.GetCategory(endpoint); err != nil {
+				writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: err.Error()})
+				return
+			}
+		}
+
+		body = map[string]interface{}{"endpoints": endpoints}
+	default:
+		writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: "Unrecognized command: " + command})
+		return
+	}
+
+	log.Info("received", "command", command, "body", body)
+	if resp, ok := processCommand(w, r, vin, command, src, body, wait); ok {
+		writeResponseWithStatus(w, &resp)
+	}
+}
+
+func ProxyCommand(w http.ResponseWriter, r *http.Request) {
+	ShowRequest(r, "ProxyCommand")
+	params := mux.Vars(r)
+	vin := params["vin"]
+	command := params["command"]
+
+	switch command {
+	case "connection_status":
+	case "body_controller_state":
+	case "session_info":
+	default:
+		writeResponseWithStatus(w, &models.Response{Vin: vin, Command: command, Result: false, Reason: "Unrecognized command: " + command})
+		return
+	}
+
+	log.Info("received", "command", command)
+	if resp, ok := processCommand(w, r, vin, command, commands.CommandSource.TeslaBleHttpProxy, nil, true); ok {
+		writeResponseWithStatus(w, &resp)
 	}
 }
 
