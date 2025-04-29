@@ -1,45 +1,92 @@
 name: Release
 
-env:
-  GO_VERSION: ^1.23
-
 on:
   push:
     tags:
-      - "*"
-  workflow_dispatch:
+      - "v*.*.*"
+
+env:
+  REGISTRY: ghcr.io
 
 jobs:
-  docker:
-    name: Publish Docker :release
+  release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        branch: [main, bluez-bluetooth]
+        include:
+          - branch: main
+            tag_suffix: ""
+          - branch: bluez-bluetooth
+            tag_suffix: "-bluez"
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Login
-        uses: docker/login-action@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          username: ${{ secrets.DOCKER_USER }}
-          password: ${{ secrets.DOCKER_PASS }}
+          ref: ${{ matrix.branch }}
 
-      - name: Setup Buildx
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Meta
+      - name: Log into registry ${{ env.REGISTRY }}
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build binaries
+        run: |
+          RELEASE_VERSION=${{ github.event.release.tag_name }}${{ matrix.tag_suffix }}
+          GOOS=linux GOARCH=amd64 go build -o dist/TeslaBleHttpProxy-linux-amd64${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
+          GOOS=linux GOARCH=arm64 go build -o dist/TeslaBleHttpProxy-linux-arm64${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
+          GOOS=linux GOARCH=arm GOARM=7 go build -o dist/TeslaBleHttpProxy-linux-armv7${{ matrix.tag_suffix }} -ldflags "-s -w -X main.Version=${RELEASE_VERSION}" -trimpath
+
+      - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: wimaha/tesla-ble-http-proxy
+          images: ${{ env.REGISTRY }}/${{ github.repository }}{{ matrix.tag_suffix }}
           tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=latest
-            type=raw,value=dev
+            type=ref,event=branch
+            type=sha,format=short
+            type=semver,pattern={{version}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{major}}.{{minor}}${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=latest${{ matrix.tag_suffix }},enable=${{ github.ref_type == 'tag' }}
 
-      - name: Publish
-        uses: docker/build-push-action@v6
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64,linux/arm/v6,linux/arm/v7
-          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            APPVERSION=${{ github.event.release.tag_name }}${{ matrix.tag_suffix }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          draft: false
+          prerelease: false
+          files: |
+            dist/*
+          generate_release_notes: true
+
+  docker:
+    needs: release
+    uses: ./.github/workflows/docker.yml
