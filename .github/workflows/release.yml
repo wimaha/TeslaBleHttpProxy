@@ -86,7 +86,3 @@ jobs:
           files: |
             dist/*
           generate_release_notes: true
-
-  docker:
-    needs: release
-    uses: ./.github/workflows/docker.yml
