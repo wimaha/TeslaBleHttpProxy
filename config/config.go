@@ -32,7 +32,7 @@ func LoadConfig() *Config {
 	if addr == "" {
 		addr = ":8080"
 	}
-	log.Info("TeslaBleHttpProxy", "httpListenAddress", addr)
+	log.Info("Env:", "httpListenAddress", addr)
 
 	cacheMaxAge := os.Getenv("cacheMaxAge")
 	if cacheMaxAge == "" {
@@ -43,6 +43,7 @@ func LoadConfig() *Config {
 		log.Error("Invalid cacheMaxAge value, using default (0)", "error", err)
 		cacheMaxAgeInt = 0
 	}
+	log.Info("Env:", "cacheMaxAge", cacheMaxAgeInt)
 
 	return &Config{
 		LogLevel:          envLogLevel,
