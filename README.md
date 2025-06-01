@@ -15,6 +15,7 @@ The program stores the received requests in a queue and processes them one by on
   - [Vehicle Commands](#vehicle-commands)
   - [Vehicle Data](#vehicle-data)
   - [Body Controller State](#body-controller-state)
+- [Vehicle Compatibility and Requirements](#vehicle-compatibility-and-requirements)
 
 ## How to install
 
@@ -201,3 +202,7 @@ The body controller state is fetched from the vehicle and returnes the state of 
 
 Get body controller state:
 `http://localhost:8080/api/1/vehicles/{VIN}/body_controller_state`
+
+## Vehicle Compatibility and Requirements
+
+TeslaBleHttpProxy requires your Tesla vehicle to support **Phone Key** functionality, as it relies on Bluetooth Low Energy (BLE) for communication. Most Tesla models from 2021 onward support Phone Key, but some older models (e.g., Model X 2015–2020) may not. Please verify Phone Key support in your Tesla app or consult Tesla's [Vehicle Keys Support Page](https://www.tesla.com/support/tesla-vehicle-keys) before setting up the proxy. Ensure the device running TeslaBleHttpProxy is within Bluetooth range (~5–10 meters) of your vehicle.
