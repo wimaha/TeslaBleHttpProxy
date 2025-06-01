@@ -15,7 +15,7 @@ The program stores the received requests in a queue and processes them one by on
   - [Vehicle Commands](#vehicle-commands)
   - [Vehicle Data](#vehicle-data)
   - [Body Controller State](#body-controller-state)
-- [Vehicle Compatibility and Requirements](#vehicle-compatibility-and-requirements)
+- [Vehicle and Connection Requirements](#vehicle-and-connection-requirements)
 
 ## How to install
 
@@ -203,6 +203,8 @@ The body controller state is fetched from the vehicle and returnes the state of 
 Get body controller state:
 `http://localhost:8080/api/1/vehicles/{VIN}/body_controller_state`
 
-## Vehicle Compatibility and Requirements
+## Vehicle and Connection Requirements
 
-TeslaBleHttpProxy requires your Tesla vehicle to support **Phone Key** functionality, as it relies on Bluetooth Low Energy (BLE) for communication. Most Tesla models from 2021 onward support Phone Key, but some older models (e.g., Model X 2015–2020) may not. Please verify Phone Key support in your Tesla app or consult Tesla's [Vehicle Keys Support Page](https://www.tesla.com/support/tesla-vehicle-keys) before setting up the proxy. Ensure the device running TeslaBleHttpProxy is within Bluetooth range (~5–10 meters) of your vehicle.
+TeslaBleHttpProxy requires your Tesla vehicle to support **Phone Key** functionality, as it relies on Bluetooth Low Energy (BLE) for communication. Most Tesla models from 2021 onward support Phone Key, but some older models (e.g., Model X 2015–2020) may not. Please verify Phone Key support in your Tesla app or consult Tesla's [Vehicle Keys Support Page](https://www.tesla.com/support/tesla-vehicle-keys) before setting up the proxy.
+
+Due to BLE's power-saving design, Tesla vehicles may terminate connections after ~30 seconds, causing "connection timeout" logs. This is normal, and the proxy reconnects automatically, ensuring EVCC or other integrations work without issues. Keep the proxy device within ~5-10 meters of the vehicle for reliable connections.
