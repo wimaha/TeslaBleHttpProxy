@@ -8,7 +8,7 @@ on:
 
 jobs:
   docker:
-    name: Publish Docker :release
+    name: Publish Docker :dev
     runs-on: ubuntu-latest
 
     steps:
