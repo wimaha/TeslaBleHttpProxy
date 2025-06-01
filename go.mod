@@ -1,11 +1,12 @@
 module github.com/wimaha/TeslaBleHttpProxy
 
-go 1.23.3
+go 1.24.3
 
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/teslamotors/vehicle-command v0.2.1
+	google.golang.org/protobuf v1.34.2
 )
 
 require (
@@ -16,7 +17,7 @@ require (
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/go-ble/ble v0.0.0-20240122180141-8c5522f54333 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -31,9 +32,8 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/sys v0.24.0 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace github.com/teslamotors/vehicle-command => github.com/wimaha/vehicle-command v0.0.4
+replace github.com/teslamotors/vehicle-command => github.com/wimaha/vehicle-command v0.0.6
 
 replace github.com/go-ble/ble => github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268
