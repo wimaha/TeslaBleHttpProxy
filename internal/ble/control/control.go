@@ -177,7 +177,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 	var err error
 	log.Debug("scan for vehicle ...")
-	// Vehicle sends a beacon every ~200ms, so if it is not found in (scanTimeout=1) seconds, it is likely not in range and not worth retrying.
+	// Vehicle sends a beacon every ~200ms, so if it is not found in (scanTimeout=2) seconds, it is likely not in range and not worth retrying.
 	scanTimeout := config.AppConfig.ScanTimeout
 	var scanCtx context.Context
 	var cancelScan context.CancelFunc

@@ -48,12 +48,12 @@ func LoadConfig() *Config {
 
 	scanTimeout := os.Getenv("scanTimeout")
 	if scanTimeout == "" {
-		scanTimeout = "1" // default value
+		scanTimeout = "2" // default value
 	}
 	scanTimeoutInt, err := strconv.Atoi(scanTimeout)
 	if err != nil {
-		log.Error("Invalid scanTimeout value, using default (1)", "error", err)
-		scanTimeoutInt = 1
+		log.Error("Invalid scanTimeout value, using default (2)", "error", err)
+		scanTimeoutInt = 2
 	}
 	log.Info("Env:", "scanTimeout", scanTimeoutInt)
 
