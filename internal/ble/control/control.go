@@ -157,7 +157,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 }
 
 func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *commands.Command) (*ble.Connection, *vehicle.Vehicle, bool, error) {
-	log.Debug("connecting to vehicle (A)...")
+	log.Debug("try connecting to vehicle ...")
 	var conn *ble.Connection
 	var car *vehicle.Vehicle
 	var shouldDefer = true
@@ -176,7 +176,41 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	}()
 
 	var err error
-	conn, err = ble.NewConnection(ctx, firstCommand.Vin)
+	log.Debug("scan for vehicle ...")
+	// Vehicle sends a beacon every ~200ms, so if it is not found in (scanTimeout=2) seconds, it is likely not in range and not worth retrying.
+	scanTimeout := config.AppConfig.ScanTimeout
+	var scanCtx context.Context
+	var cancelScan context.CancelFunc
+	if scanTimeout > 0 {
+		scanCtx, cancelScan = context.WithTimeout(ctx, time.Duration(scanTimeout)*time.Second)
+	} else {
+		scanCtx, cancelScan = context.WithCancel(ctx)
+	}
+	defer cancelScan()
+
+	scanResult, err := ble.ScanVehicleBeacon(scanCtx, firstCommand.Vin)
+	if err != nil {
+		if scanCtx.Err() != nil {
+			return nil, nil, false, fmt.Errorf("vehicle not in range: %s", err)
+		} else {
+			if strings.Contains(err.Error(), "operation not permitted") {
+				// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
+				// heavy-handed way of dealing with devices that are in a bad state.
+				return nil, nil, false, fmt.Errorf("failed to connect to vehicle (A): %s\nTry again after granting this application CAP_NET_ADMIN:\nsudo setcap 'cap_net_admin=eip' \"$(which %s)\"", err, os.Args[0])
+			} else {
+				return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
+			}
+		}
+	}
+
+	log.Debug("beacon found", "localName", scanResult.LocalName, "addr", scanResult.Address, "rssi", scanResult.RSSI)
+	log.Debug("connect to vehicle ...")
+	conn, err = ble.NewConnectionFromScanResult(ctx, firstCommand.Vin, scanResult)
+	if err != nil {
+		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
+	}
+
+	/*conn, err = ble.NewConnection(ctx, firstCommand.Vin)
 	if err != nil {
 		if strings.Contains(err.Error(), "operation not permitted") {
 			// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
@@ -185,7 +219,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		} else {
 			return nil, nil, true, fmt.Errorf("failed to connect to vehicle (A): %s", err)
 		}
-	}
+	}*/
 	//defer conn.Close()
 
 	log.Debug("create vehicle object ...")

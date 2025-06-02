@@ -30,8 +30,6 @@ services:
   tesla-ble-http-proxy:
     image: wimaha/tesla-ble-http-proxy
     container_name: tesla-ble-http-proxy
-    environment:
-      - cacheMaxAge=30 # Optional, but recommended to set this to anything more than 0 if you are using the vehicle data
     volumes:
       - ~/TeslaBleHttpProxy/key:/key
       - /var/run/dbus:/var/run/dbus

@@ -13,6 +13,7 @@ var PrivateKeyFile = "key/private.pem"
 type Config struct {
 	LogLevel          string
 	HttpListenAddress string
+	ScanTimeout       int // Seconds to scan for BLE devices
 	CacheMaxAge       int // Seconds to cache BLE responses
 }
 
@@ -36,19 +37,31 @@ func LoadConfig() *Config {
 
 	cacheMaxAge := os.Getenv("cacheMaxAge")
 	if cacheMaxAge == "" {
-		cacheMaxAge = "0" // default value
+		cacheMaxAge = "5" // default value
 	}
 	cacheMaxAgeInt, err := strconv.Atoi(cacheMaxAge)
 	if err != nil {
-		log.Error("Invalid cacheMaxAge value, using default (0)", "error", err)
-		cacheMaxAgeInt = 0
+		log.Error("Invalid cacheMaxAge value, using default (5)", "error", err)
+		cacheMaxAgeInt = 5
 	}
 	log.Info("Env:", "cacheMaxAge", cacheMaxAgeInt)
+
+	scanTimeout := os.Getenv("scanTimeout")
+	if scanTimeout == "" {
+		scanTimeout = "2" // default value
+	}
+	scanTimeoutInt, err := strconv.Atoi(scanTimeout)
+	if err != nil {
+		log.Error("Invalid scanTimeout value, using default (2)", "error", err)
+		scanTimeoutInt = 2
+	}
+	log.Info("Env:", "scanTimeout", scanTimeoutInt)
 
 	return &Config{
 		LogLevel:          envLogLevel,
 		HttpListenAddress: addr,
 		CacheMaxAge:       cacheMaxAgeInt,
+		ScanTimeout:       scanTimeoutInt,
 	}
 }
 
