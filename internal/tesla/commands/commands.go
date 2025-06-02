@@ -13,7 +13,6 @@ import (
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
@@ -200,15 +199,15 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		}
 		command.Response.Response = responseJson
 	case "body-controller-state":
-		info, err := car.BodyControllerState(ctx)
+		vs, err := car.BodyControllerState(ctx)
 		if err != nil {
 			return true, fmt.Errorf("failed to get body controller state: %s", err)
 		}
-		d, err := protojson.Marshal(info)
+		vsJson, err := json.Marshal(models.VehicleStatusFromBle(vs))
 		if err != nil {
 			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
 		}
-		command.Response.Response = d
+		command.Response.Response = vsJson
 	default:
 		return false, fmt.Errorf("unrecognized command: %s", command.Command)
 	}

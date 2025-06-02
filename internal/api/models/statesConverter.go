@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/carserver"
+	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 )
 
 func flatten(s string) string {
@@ -122,3 +123,32 @@ func ClimateStateFromBle(VehicleData *carserver.VehicleData) ClimateState {
 MISSING
 	SmartPreconditioning       bool        `json:"smart_preconditioning"`
 */
+
+func ClosureStatusesFromBle(cs *vcsec.ClosureStatuses) *ClosureStatuses {
+	return &ClosureStatuses{
+		FrontDriverDoor:    flatten(cs.GetFrontDriverDoor().String()),
+		FrontPassengerDoor: flatten(cs.GetFrontPassengerDoor().String()),
+		RearDriverDoor:     flatten(cs.GetRearDriverDoor().String()),
+		RearPassengerDoor:  flatten(cs.GetRearPassengerDoor().String()),
+		RearTrunk:          flatten(cs.GetRearTrunk().String()),
+		FrontTrunk:         flatten(cs.GetFrontTrunk().String()),
+		ChargePort:         flatten(cs.GetChargePort().String()),
+		Tonneau:            flatten(cs.GetTonneau().String()),
+	}
+}
+
+func DetailedClosureStatusFromBle(dcs *vcsec.DetailedClosureStatus) *DetailedClosureStatus {
+	return &DetailedClosureStatus{
+		TonneauPercentOpen: int32(dcs.GetTonneauPercentOpen()),
+	}
+}
+
+func VehicleStatusFromBle(vs *vcsec.VehicleStatus) VehicleStatus {
+	return VehicleStatus{
+		ClosureStatuses:       ClosureStatusesFromBle(vs.GetClosureStatuses()),
+		DetailedClosureStatus: DetailedClosureStatusFromBle(vs.GetDetailedClosureStatus()),
+		UserPresence:          flatten(vs.GetUserPresence().String()),
+		VehicleLockState:      flatten(vs.GetVehicleLockState().String()),
+		VehicleSleepStatus:    flatten(vs.GetVehicleSleepStatus().String()),
+	}
+}

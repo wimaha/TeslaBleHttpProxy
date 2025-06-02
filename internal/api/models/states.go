@@ -100,3 +100,29 @@ type ClimateState struct {
 	SideMirrorHeaters                      bool        `json:"side_mirror_heaters"`                         //
 	WiperBladeHeater                       bool        `json:"wiper_blade_heater"`                          //
 }
+
+// ClosureStatuses contains the current closure states available from the vehicle.
+type ClosureStatuses struct {
+	FrontDriverDoor    string `json:"front_driver_door"`
+	FrontPassengerDoor string `json:"front_passenger_door"`
+	RearDriverDoor     string `json:"rear_driver_door"`
+	RearPassengerDoor  string `json:"rear_passenger_door"`
+	RearTrunk          string `json:"rear_trunk"`
+	FrontTrunk         string `json:"front_trunk"`
+	ChargePort         string `json:"charge_port"`
+	Tonneau            string `json:"tonneau"`
+}
+
+// DetailedClosureStatus contains the current detailed closure states available from the vehicle.
+type DetailedClosureStatus struct {
+	TonneauPercentOpen int32 `json:"tonneau_percent_open"`
+}
+
+// VehicleStatus contains the current vehicle status available from the vehicle.
+type VehicleStatus struct {
+	ClosureStatuses       *ClosureStatuses       `json:"closure_statuses"`
+	DetailedClosureStatus *DetailedClosureStatus `json:"detailed_closure_status"`
+	UserPresence          string                 `json:"user_presence"`
+	VehicleLockState      string                 `json:"vehicle_lock_state"`
+	VehicleSleepStatus    string                 `json:"vehicle_sleep_status"`
+}
