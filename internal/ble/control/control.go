@@ -371,6 +371,8 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 	// Wrap ctx with connectionCtx
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Create a single goroutine to handle both context cancellations
 	go func() {
 		select {
 		case <-connectionCtx.Done():
@@ -383,9 +385,13 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		if i > 0 {
 			log.Warn(lastErr)
 			log.Info(fmt.Sprintf("retrying in %d seconds", sleep/time.Second))
+
 			select {
 			case <-time.After(sleep):
 			case <-ctx.Done():
+				if connectionCtx.Err() != nil {
+					return command, ctx.Err(), ctx
+				}
 				return nil, ctx.Err(), ctx
 			}
 			sleep *= 2
@@ -393,20 +399,21 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 
 		retry, err := command.Send(ctx, car)
 		if err == nil {
-			//Successful
 			log.Info("successfully executed", "command", command.Command, "body", command.Body)
 			return nil, nil, ctx
-		} else if !retry {
-			return nil, nil, ctx
-		} else {
-			//closed pipe
-			if strings.Contains(err.Error(), "closed pipe") {
-				//connection lost, returning the command so it can be executed again
-				return command, err, ctx
-			}
-			lastErr = err
 		}
+
+		if !retry {
+			return nil, nil, ctx
+		}
+
+		if strings.Contains(err.Error(), "closed pipe") {
+			return command, err, ctx
+		}
+
+		lastErr = err
 	}
+
 	log.Error("canceled", "command", command.Command, "body", command.Body, "err", lastErr)
 	return nil, lastErr, ctx
 }
