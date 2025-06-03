@@ -77,11 +77,11 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.ChargeStart(ctx); err != nil {
 			if strings.Contains(err.Error(), "is_charging") {
 				//The car is already charging, so the command is somehow successfully executed.
-				log.Info("the car is already charging")
+				log.Info("The car is already charging")
 				return false, nil
 			} else if strings.Contains(err.Error(), "complete") {
 				//The charging is completed, so the command is somehow successfully executed.
-				log.Info("the charging is completed")
+				log.Info("The charging is completed")
 				return false, nil
 			}
 			return true, fmt.Errorf("failed to start charge: %s", err)
@@ -90,7 +90,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.ChargeStop(ctx); err != nil {
 			if strings.Contains(err.Error(), "not_charging") {
 				//The car has already stopped charging, so the command is somehow successfully executed.
-				log.Info("the car has already stopped charging")
+				log.Info("The car has already stopped charging")
 				return false, nil
 			}
 			return true, fmt.Errorf("failed to stop charge: %s", err)
@@ -163,14 +163,14 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 
 		response := make(map[string]json.RawMessage)
 		for _, endpoint := range endpoints {
-			log.Debugf("get: %s", endpoint)
+			//log.Debugf("get: %s", endpoint)
 			category, err := GetCategory(endpoint)
 			if err != nil {
 				return false, err
 			}
 			data, err := car.GetState(ctx, category)
 			if err != nil {
-				return true, fmt.Errorf("failed to get vehicle data: %s", err)
+				return true, fmt.Errorf("Failed to get vehicle data: %s", err)
 			}
 			/*d, err := protojson.Marshal(data)
 			if err != nil {
@@ -187,7 +187,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			}
 			d, err := json.Marshal(converted)
 			if err != nil {
-				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
+				return true, fmt.Errorf("Failed to marshal vehicle data: %s", err)
 			}
 
 			response[endpoint] = d

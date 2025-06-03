@@ -19,14 +19,14 @@ func CreatePrivateAndPublicKeyFile() error {
 	// Generate ECDSA private key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		log.Error("error generating ECDSA private key", "err", err)
+		log.Error("Error generating ECDSA private key", "Error", err)
 		return err
 	}
 
 	// Encode the private key to PEM format
 	x509Encoded, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		log.Error("error encoding ECDSA private key", "err", err)
+		log.Error("Error encoding ECDSA private key", "Error", err)
 		return err
 	}
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: x509Encoded})
@@ -34,14 +34,14 @@ func CreatePrivateAndPublicKeyFile() error {
 	// Write the PEM-encoded private key to a file
 	privateKeyFile, err := os.Create(config.PrivateKeyFile)
 	if err != nil {
-		log.Error("Error creating private key file", "err", err)
+		log.Error("Error creating private key file", "Error", err)
 		return err
 	}
 	defer privateKeyFile.Close()
 
 	_, err = privateKeyFile.Write(pemEncoded)
 	if err != nil {
-		log.Error("Error writing to private key file", "err", err)
+		log.Error("Error writing to private key file", "Error", err)
 		return err
 	}
 
@@ -53,7 +53,7 @@ func CreatePrivateAndPublicKeyFile() error {
 	// Encode the public key to PEM format
 	x509EncodedPub, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
-		log.Error("Error encoding ECDSA public key", "err", err)
+		log.Error("Error encoding ECDSA public key", "Error", err)
 		return err
 	}
 	pemEncodedPublicKey := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
@@ -61,14 +61,14 @@ func CreatePrivateAndPublicKeyFile() error {
 	// Write the PEM-encoded public key to a file
 	publicKeyFile, err := os.Create(config.PublicKeyFile)
 	if err != nil {
-		log.Error("Error creating public key file", "err", err)
+		log.Error("Error creating public key file", "Error", err)
 		return err
 	}
 	defer publicKeyFile.Close()
 
 	_, err = publicKeyFile.Write(pemEncodedPublicKey)
 	if err != nil {
-		log.Error("Error writing to public key file", "err", err)
+		log.Error("Error writing to public key file", "Error", err)
 		return err
 	}
 

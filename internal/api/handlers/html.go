@@ -45,7 +45,7 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 			Messages:      messages,
 		}
 		if err := Dashboard(w, p, "", html); err != nil {
-			log.Error("error showing dashboard", "error", err)
+			log.Error("Error showing dashboard", "Error", err)
 		}
 	}
 }
