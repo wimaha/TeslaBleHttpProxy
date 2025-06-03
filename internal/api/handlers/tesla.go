@@ -31,7 +31,7 @@ func commonDefer(w http.ResponseWriter, response *models.Response) {
 	if err := json.NewEncoder(w).Encode(ret); err != nil {
 		log.Fatal("failed to send response", "error", err)
 	}
-	log.Debug("response", "command", response.Command, "status", status, "result", response.Result, "reason", response.Reason)
+	log.Debug("Response", "Command", response.Command, "Status", status, "Result", response.Result, "Reason", response.Reason)
 }
 
 func checkBleControl(response *models.Response) bool {
@@ -44,7 +44,6 @@ func checkBleControl(response *models.Response) bool {
 }
 
 func Command(w http.ResponseWriter, r *http.Request) {
-	ShowRequest(r, "Command")
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := params["command"]
@@ -64,13 +63,13 @@ func Command(w http.ResponseWriter, r *http.Request) {
 	//Body
 	var body map[string]interface{} = nil
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
-		log.Error("decoding body", "err", err)
+		log.Error("Decoding body", "Error", err)
 	}
 
-	log.Info("received", "command", command, "body", body)
+	logRequestWithBody(r, "Command", body)
 
 	if !slices.Contains(commands.ExceptedCommands, command) {
-		log.Error("not supported", "command", command)
+		log.Error("Command not supported", "Command", command)
 		response.Reason = fmt.Sprintf("The command \"%s\" is not supported.", command)
 		response.Result = false
 		return
@@ -104,7 +103,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 }
 
 func VehicleData(w http.ResponseWriter, r *http.Request) {
-	ShowRequest(r, "VehicleData")
+	logRequest(r, "VehicleData")
 	params := mux.Vars(r)
 	vin := params["vin"]
 	command := "vehicle_data"
@@ -123,7 +122,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	for _, endpoint := range endpoints {
 		if !slices.Contains(commands.ExceptedEndpoints, endpoint) {
-			log.Error("not supported", "endpoint", endpoint)
+			log.Error("Endpoint not supported", "Endpoint", endpoint)
 			response.Reason = fmt.Sprintf("The endpoint \"%s\" is not supported.", endpoint)
 			response.Result = false
 			return
@@ -159,7 +158,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 }
 
 func BodyControllerState(w http.ResponseWriter, r *http.Request) {
-	ShowRequest(r, "BodyControllerState")
+	logRequest(r, "BodyControllerState")
 	params := mux.Vars(r)
 	vin := params["vin"]
 
@@ -188,9 +187,9 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		//Successful
 		defer conn.Close()
-		defer log.Debug("close connection (A)")
+		//defer log.Debug("close connection (A)")
 		defer car.Disconnect()
-		defer log.Debug("disconnect vehicle (A)")
+		//defer log.Debug("disconnect vehicle (A)")
 
 		_, err, _ := control.BleControlInstance.ExecuteCommand(car, cmd, context.Background())
 		if err != nil {
@@ -215,8 +214,12 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ShowRequest(r *http.Request, handler string) {
-	log.Debug("received", "handler", handler, "method", r.Method, "url", r.URL, "from", r.RemoteAddr)
+func logRequest(r *http.Request, handler string) {
+	log.Debug("Received HTTP request", "Handler", handler, "Method", r.Method, "Endpoint", r.URL, "Client", r.RemoteAddr)
+}
+
+func logRequestWithBody(r *http.Request, handler string, body map[string]interface{}) {
+	log.Debug("Received HTTP request", "Handler", handler, "Method", r.Method, "Endpoint", r.URL, "Client", r.RemoteAddr, "Body", body)
 }
 
 func SetCacheControl(w http.ResponseWriter, maxAge int) {
