@@ -371,9 +371,11 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 	// Wrap ctx with connectionCtx
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	connectionCtxDone := false
 	go func() {
 		select {
 		case <-connectionCtx.Done():
+			connectionCtxDone = true
 			cancel()
 		case <-ctx.Done():
 		}
@@ -386,6 +388,9 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 			select {
 			case <-time.After(sleep):
 			case <-ctx.Done():
+				if connectionCtxDone {
+					return command, ctx.Err(), ctx
+				}
 				return nil, ctx.Err(), ctx
 			}
 			sleep *= 2

@@ -166,7 +166,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			log.Debugf("get: %s", endpoint)
 			category, err := GetCategory(endpoint)
 			if err != nil {
-				return false, fmt.Errorf("unrecognized state category charge")
+				return false, err
 			}
 			data, err := car.GetState(ctx, category)
 			if err != nil {
