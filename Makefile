@@ -3,7 +3,7 @@ TAG_NAME := $(shell test -d .git && git describe --abbrev=0 --tags)
 SHA := $(shell test -d .git && git rev-parse --short HEAD)
 VERSION := $(if $(TAG_NAME),$(TAG_NAME),$(SHA))
 
-LD_FLAGS := -X main.Version=$(VERSION) -s -w
+LD_FLAGS := -X github.com/wimaha/TeslaBleHttpProxy/config.Version=$(VERSION) -s -w
 BUILD_ARGS := -ldflags='$(LD_FLAGS)'
 BUILD_DATE := $(shell date -u '+%Y-%m-%d_%H:%M:%S')
 
