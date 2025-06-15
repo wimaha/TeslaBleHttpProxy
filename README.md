@@ -15,6 +15,7 @@ The program stores the received requests in a queue and processes them one by on
   - [Vehicle Commands](#vehicle-commands)
   - [Vehicle Data](#vehicle-data)
   - [Body Controller State](#body-controller-state)
+  - [Version of Proxy](#version-of-proxy)
 - [Vehicle and Connection Requirements](#vehicle-and-connection-requirements)
 
 ## How to install
@@ -200,6 +201,13 @@ The body controller state is fetched from the vehicle and returnes the state of 
 
 Get body controller state:
 `http://localhost:8080/api/1/vehicles/{VIN}/body_controller_state`
+
+### Version of Proxy
+
+Get version of proxy:
+`http://localhost:8080/api/proxy/1/version`
+
+The response will contain the version of the proxy.
 
 ## Vehicle and Connection Requirements
 

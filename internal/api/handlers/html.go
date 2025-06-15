@@ -19,6 +19,7 @@ type DashboardParams struct {
 	PublicKey     string
 	ShouldGenKeys bool
 	Messages      []models.Message
+	Version       string
 }
 
 func ShowDashboard(html fs.FS) http.HandlerFunc {
@@ -43,6 +44,7 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 			PublicKey:     publicKey,
 			ShouldGenKeys: shouldGenKeys,
 			Messages:      messages,
+			Version:       config.Version,
 		}
 		if err := Dashboard(w, p, "", html); err != nil {
 			log.Error("Error showing dashboard", "Error", err)

@@ -16,10 +16,8 @@ var static embed.FS
 //go:embed html/*
 var html embed.FS
 
-var Version = "*undefined*"
-
 func main() {
-	log.Infof("TeslaBleHttpProxy %s is loading ...", Version)
+	log.Infof("TeslaBleHttpProxy %s is loading ...", config.Version)
 
 	config.InitConfig()
 

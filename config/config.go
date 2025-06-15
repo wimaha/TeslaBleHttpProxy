@@ -10,6 +10,9 @@ import (
 var PublicKeyFile = "key/public.pem"
 var PrivateKeyFile = "key/private.pem"
 
+// Version is set at build time via linker flags
+var Version = "*undefined*"
+
 type Config struct {
 	LogLevel          string
 	HttpListenAddress string

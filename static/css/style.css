@@ -25,6 +25,18 @@ h1 {
     font-size: 24px;
 }
 
+.version {
+    font-size: 12px;
+    color: #666;
+    font-weight: normal;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
 .settings-list {
     list-style-type: none;
     padding: 0;
