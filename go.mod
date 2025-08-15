@@ -1,6 +1,6 @@
 module github.com/wimaha/TeslaBleHttpProxy
 
-go 1.24.3
+go 1.24
 
 require (
 	github.com/charmbracelet/log v0.4.0
