@@ -49,6 +49,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 	command := params["command"]
 
 	wait := r.URL.Query().Get("wait") == "true"
+	autoWakeup := r.URL.Query().Get("wakeup") == "true"
 
 	var response models.Response
 	response.Vin = vin
@@ -82,7 +83,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		apiResponse.Ctx = r.Context()
 
 		wg.Add(1)
-		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse)
+		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse, autoWakeup)
 
 		wg.Wait()
 
@@ -97,7 +98,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	control.BleControlInstance.PushCommand(command, vin, body, nil)
+	control.BleControlInstance.PushCommand(command, vin, body, nil, autoWakeup)
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
@@ -141,7 +142,8 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	apiResponse.Ctx = r.Context()
 
 	wg.Add(1)
-	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse)
+	autoWakeup := r.URL.Query().Get("wakeup") == "true"
+	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse, autoWakeup)
 
 	wg.Wait()
 

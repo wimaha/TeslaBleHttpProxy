@@ -80,12 +80,13 @@ func (bc *BleControl) Loop() {
 	}
 }
 
-func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse) {
+func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse, autoWakeup bool) {
 	bc.commandStack <- commands.Command{
-		Command:  command,
-		Vin:      vin,
-		Body:     body,
-		Response: response,
+		Command:    command,
+		Vin:        vin,
+		Body:       body,
+		Response:   response,
+		AutoWakeup: autoWakeup,
 	}
 }
 
@@ -237,7 +238,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	//Start Session only if privateKey is available
 	if bc.privateKey != nil {
 		log.Debug("Starting VCSEC session ...")
-		// First connect just VCSEC so we can Wakeup() the car if needed.
+		// First connect just VCSEC
 		if err := car.StartSession(ctx, []universalmessage.Domain{
 			protocol.DomainVCSEC,
 		}); err != nil {
@@ -245,10 +246,13 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		}
 
 		if firstCommand.Domain != commands.Domain.VCSEC {
-			if err := car.Wakeup(ctx); err != nil {
-				return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
-			} else {
-				log.Debug("Car successfully wakeup")
+			// Wake up the car if requested
+			if firstCommand.AutoWakeup {
+				if err := car.Wakeup(ctx); err != nil {
+					return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+				} else {
+					log.Debug("Car successfully wakeup")
+				}
 			}
 
 			log.Debug("Starting Infotainment session ...")
@@ -276,11 +280,9 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
 	defer cancel()
 
-	if firstCommand.Command != "wake_up" {
-		cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
-		if err != nil {
-			return cmd
-		}
+	cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
+	if err != nil {
+		return cmd
 	}
 
 	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {

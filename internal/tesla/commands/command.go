@@ -21,11 +21,12 @@ var Domain = struct {
 }
 
 type Command struct {
-	Command  string
-	Domain   DomainType
-	Vin      string
-	Body     map[string]interface{}
-	Response *models.ApiResponse
+	Command    string
+	Domain     DomainType
+	Vin        string
+	Body       map[string]interface{}
+	Response   *models.ApiResponse
+	AutoWakeup bool
 }
 
 // 'charge_state', 'climate_state', 'closures_state', 'drive_state', 'gui_settings', 'location_data', 'charge_schedule_data', 'preconditioning_schedule_data', 'vehicle_config', 'vehicle_state', 'vehicle_data_combo'
