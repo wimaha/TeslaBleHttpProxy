@@ -62,7 +62,9 @@ func Command(w http.ResponseWriter, r *http.Request) {
 	command := params["command"]
 
 	wait := r.URL.Query().Get("wait") == "true"
-	autoWakeup := r.URL.Query().Get("wakeup") == "true"
+	// Commands always wake up the car automatically (except wake_up itself)
+	// The wakeup parameter is ignored for commands, only used for vehicle_data
+	autoWakeup := command != "wake_up"
 
 	var response models.Response
 	response.Vin = vin
