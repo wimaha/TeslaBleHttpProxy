@@ -68,8 +68,8 @@ github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
 github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268 h1:36sDJ2qts2oT/Fy/Wi6MR15C+LHl2+ZUzLp6UaqhS9c=
 github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268/go.mod h1:fFJl/jD/uyILGBeD5iQ8tYHrPlJafyqCJzAyTHNJ1Uk=
-github.com/wimaha/vehicle-command v0.0.6 h1:e41t372ApEcTl7/vfhgupJP4FFfpYnAnrJsODEgTtvg=
-github.com/wimaha/vehicle-command v0.0.6/go.mod h1:l7Rxdpd/9QBnQnj6NQ/w4Vb5OSE1cB7okS4qmf+rIwI=
+github.com/wimaha/vehicle-command v0.0.7 h1:4eKH1/NCTKqGe/yehJGgV6zjDzjlSGmFlxoSyjUe2sY=
+github.com/wimaha/vehicle-command v0.0.7/go.mod h1:aL0IRpLu+l205NxejRkuxpqAovw69rDKriBKKyP8gLI=
 golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa h1:ELnwvuAXPNtPk1TJRuGkI9fDTwym6AYBu0qzT8AcHdI=
 golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa/go.mod h1:akd2r19cwCdwSwWeIdzYQGa/EZZyqcOdwWiwj5L5eKQ=
 golang.org/x/sys v0.0.0-20190422165155-953cdadca894/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

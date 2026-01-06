@@ -1,12 +1,11 @@
 module github.com/wimaha/TeslaBleHttpProxy
 
-go 1.24.3
+go 1.25.5
 
 require (
 	github.com/charmbracelet/log v0.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/teslamotors/vehicle-command v0.2.1
-	google.golang.org/protobuf v1.34.2
 )
 
 require (
@@ -32,8 +31,9 @@ require (
 	github.com/stretchr/testify v1.10.0 // indirect
 	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/sys v0.24.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 )
 
-replace github.com/teslamotors/vehicle-command => github.com/wimaha/vehicle-command v0.0.6
+replace github.com/teslamotors/vehicle-command => github.com/wimaha/vehicle-command v0.0.7
 
 replace github.com/go-ble/ble => github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268

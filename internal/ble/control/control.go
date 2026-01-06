@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -38,6 +39,10 @@ type BleControl struct {
 
 	commandStack  chan commands.Command
 	providerStack chan commands.Command
+
+	// Cache to track when each vehicle was last confirmed awake
+	lastAwakeTime map[string]time.Time
+	awakeTimeMu   sync.RWMutex
 }
 
 func NewBleControl() (*BleControl, error) {
@@ -53,6 +58,7 @@ func NewBleControl() (*BleControl, error) {
 		privateKey:    privateKey,
 		commandStack:  make(chan commands.Command, 50),
 		providerStack: make(chan commands.Command),
+		lastAwakeTime: make(map[string]time.Time),
 	}, nil
 }
 
@@ -80,13 +86,36 @@ func (bc *BleControl) Loop() {
 	}
 }
 
-func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse) {
+func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse, autoWakeup bool) {
 	bc.commandStack <- commands.Command{
-		Command:  command,
-		Vin:      vin,
-		Body:     body,
-		Response: response,
+		Command:    command,
+		Vin:        vin,
+		Body:       body,
+		Response:   response,
+		AutoWakeup: autoWakeup,
 	}
+}
+
+// shouldCheckSleepStatus returns true if we need to check the vehicle's sleep status
+// (i.e., if it's been more than 9 minutes since we last confirmed it was awake)
+func (bc *BleControl) shouldCheckSleepStatus(vin string) bool {
+	bc.awakeTimeMu.RLock()
+	lastAwake, exists := bc.lastAwakeTime[vin]
+	bc.awakeTimeMu.RUnlock()
+
+	if !exists {
+		return true // No cache entry, need to check
+	}
+
+	// Check if it's been more than 9 minutes
+	return time.Since(lastAwake) > 9*time.Minute
+}
+
+// markVehicleAwake records that the vehicle was confirmed awake at this time
+func (bc *BleControl) markVehicleAwake(vin string) {
+	bc.awakeTimeMu.Lock()
+	bc.lastAwakeTime[vin] = time.Now()
+	bc.awakeTimeMu.Unlock()
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
@@ -237,29 +266,106 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	//Start Session only if privateKey is available
 	if bc.privateKey != nil {
 		log.Debug("Starting VCSEC session ...")
-		// First connect just VCSEC so we can Wakeup() the car if needed.
+		// First connect just VCSEC
 		if err := car.StartSession(ctx, []universalmessage.Domain{
 			protocol.DomainVCSEC,
 		}); err != nil {
 			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
 		}
 
-		if firstCommand.Domain != commands.Domain.VCSEC {
-			if err := car.Wakeup(ctx); err != nil {
-				return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
-			} else {
-				log.Debug("Car successfully wakeup")
-			}
+		// wake_up command can execute with just VCSEC, but we still need Infotainment for other commands
+		isWakeUpCommand := firstCommand.Command == "wake_up"
 
-			log.Debug("Starting Infotainment session ...")
-			// Then we can also connect the infotainment
-			if err := car.StartSession(ctx, []universalmessage.Domain{
-				protocol.DomainVCSEC,
-				protocol.DomainInfotainment,
-			}); err != nil {
-				return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+		if firstCommand.Domain != commands.Domain.VCSEC || isWakeUpCommand {
+			// For wake_up, skip sleep check and Infotainment setup (it only needs VCSEC)
+			if isWakeUpCommand {
+				log.Debug("Wake_up command detected, VCSEC session is sufficient")
+				log.Info("Connection to vehicle established (VCSEC only for wake_up)")
+			} else {
+				// For vehicle_data, use conditional wakeup (check cache, only wake if needed)
+				// For all other commands, always wake up if needed
+				isVehicleData := firstCommand.Command == "vehicle_data"
+
+				if isVehicleData {
+					// Conditional wakeup for vehicle_data: check cache first
+					needToCheck := bc.shouldCheckSleepStatus(firstCommand.Vin)
+
+					if needToCheck {
+						log.Debug("Checking vehicle sleep status for vehicle_data (cache expired or not available) ...")
+						vs, err := car.BodyControllerState(ctx)
+						if err != nil {
+							log.Debug("Failed to get body controller state", "Error", err)
+							// If we can't check status and AutoWakeup is requested, try to wake up anyway
+							if firstCommand.AutoWakeup {
+								log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
+								if err := car.Wakeup(ctx); err != nil {
+									return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+								}
+								log.Debug("Car wakeup command sent")
+								// Mark as awake after successful wakeup
+								bc.markVehicleAwake(firstCommand.Vin)
+							} else {
+								return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
+							}
+						} else {
+							sleepStatus := vs.GetVehicleSleepStatus().String()
+							if strings.Contains(sleepStatus, "ASLEEP") {
+								log.Debug("Vehicle is asleep")
+								if firstCommand.AutoWakeup {
+									log.Debug("Waking up vehicle as requested ...")
+									if err := car.Wakeup(ctx); err != nil {
+										return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+									}
+									log.Debug("Car successfully wakeup")
+									// Mark as awake after successful wakeup
+									bc.markVehicleAwake(firstCommand.Vin)
+								} else {
+									return nil, nil, false, fmt.Errorf("vehicle is sleeping")
+								}
+							} else if strings.Contains(sleepStatus, "AWAKE") {
+								log.Debug("Vehicle is already awake")
+								// Update cache - vehicle is confirmed awake
+								bc.markVehicleAwake(firstCommand.Vin)
+							} else {
+								log.Debug("Vehicle sleep status unknown")
+								// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
+								if firstCommand.AutoWakeup {
+									log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
+									if err := car.Wakeup(ctx); err != nil {
+										log.Debug("Wakeup failed but continuing", "Error", err)
+									} else {
+										// Mark as awake after successful wakeup
+										bc.markVehicleAwake(firstCommand.Vin)
+									}
+								} else {
+									return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
+								}
+							}
+						}
+					} else {
+						log.Debug("Skipping sleep status check for vehicle_data (vehicle was awake less than 9 minutes ago)")
+					}
+				} else {
+					// For commands, always send wakeup (no need to check sleep status first)
+					log.Debug("Command detected, sending wakeup ...")
+					if err := car.Wakeup(ctx); err != nil {
+						return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+					}
+					log.Debug("Car successfully wakeup")
+					// Mark as awake after successful wakeup
+					bc.markVehicleAwake(firstCommand.Vin)
+				}
+
+				log.Debug("Starting Infotainment session ...")
+				// Then we can also connect the infotainment
+				if err := car.StartSession(ctx, []universalmessage.Domain{
+					protocol.DomainVCSEC,
+					protocol.DomainInfotainment,
+				}); err != nil {
+					return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+				}
+				log.Info("Connection to vehicle established")
 			}
-			log.Info("Connection to vehicle established")
 		}
 	} else {
 		log.Info("Key-Request connection established ...")
@@ -276,10 +382,24 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
 	defer cancel()
 
-	if firstCommand.Command != "wake_up" {
-		cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
-		if err != nil {
-			return cmd
+	cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
+	if err != nil {
+		return cmd
+	}
+
+	// If wake_up command executed successfully, upgrade session to include Infotainment
+	// for subsequent commands that might need it
+	if firstCommand.Command == "wake_up" {
+		log.Debug("Wake_up executed successfully, upgrading session to include Infotainment for subsequent commands")
+		ctx, cancelUpgrade := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelUpgrade()
+		if err := car.StartSession(ctx, []universalmessage.Domain{
+			protocol.DomainVCSEC,
+			protocol.DomainInfotainment,
+		}); err != nil {
+			log.Debug("Failed to upgrade session to Infotainment, subsequent commands may fail", "Error", err)
+		} else {
+			log.Debug("Session upgraded to include Infotainment")
 		}
 	}
 

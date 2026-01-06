@@ -139,6 +139,8 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 
 By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`.
 
+**Wake Up Behavior:** Commands **automatically wake up** the vehicle if it is asleep. You don't need to manually wake the vehicle or use any parameters - the proxy handles this automatically to ensure commands execute successfully.
+
 #### Example Request
 
 *(All requests with method POST.)*
@@ -155,9 +157,16 @@ Stop charging:
 Set charging amps to 5A:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/set_charging_amps` with body `{"charging_amps": "5"}`
 
+Explicitly wake up the vehicle:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/wake_up`
+
 ### Vehicle Data
 
 The vehicle data is fetched from the vehicle and returned in the response in the same format as the [Fleet API](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-endpoints#vehicle-data). Since a ble connection has to be established to fetch the data, it takes a few seconds before the data is returned.
+
+**Caching:** VehicleData responses are cached in memory for faster subsequent requests. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN. The cache time can be configured via the `vehicleDataCacheTime` environment variable (default: 30 seconds). If all requested endpoints are cached and valid, the response is returned immediately without establishing a BLE connection.
+
+**Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. This allows for efficient data retrieval when the vehicle is already awake. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter. The proxy uses intelligent caching to minimize unnecessary wakeup calls - if the vehicle was confirmed awake within the last 9 minutes, the sleep status check is skipped.
 
 #### Example Request
 
@@ -165,6 +174,9 @@ The vehicle data is fetched from the vehicle and returned in the response in the
 
 Get vehicle data:
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data`
+
+Get vehicle data with automatic wakeup:
+`http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?wakeup=true`
 
 Currently you will receive the following data:
 
@@ -174,6 +186,9 @@ Currently you will receive the following data:
 If you want to receive specific data, you can add the endpoints to the request. For example:
 
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=charge_state`
+
+Get specific data with automatic wakeup:
+`http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=charge_state&wakeup=true`
 
 This is recommended if you want to receive data frequently, since it will reduce the time it takes to receive the data.
 
