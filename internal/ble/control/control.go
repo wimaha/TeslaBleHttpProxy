@@ -245,60 +245,69 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 			return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (A): %s", err)
 		}
 
-		if firstCommand.Domain != commands.Domain.VCSEC {
-			// Always check if the vehicle is awake before starting Infotainment session
-			log.Debug("Checking vehicle sleep status ...")
-			vs, err := car.BodyControllerState(ctx)
-			if err != nil {
-				log.Debug("Failed to get body controller state", "Error", err)
-				// If we can't check status and AutoWakeup is requested, try to wake up anyway
-				if firstCommand.AutoWakeup {
-					log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
-					if err := car.Wakeup(ctx); err != nil {
-						return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
-					}
-					log.Debug("Car wakeup command sent")
-				} else {
-					return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
-				}
+		// wake_up command can execute with just VCSEC, but we still need Infotainment for other commands
+		isWakeUpCommand := firstCommand.Command == "wake_up"
+
+		if firstCommand.Domain != commands.Domain.VCSEC || isWakeUpCommand {
+			// For wake_up, skip sleep check and Infotainment setup (it only needs VCSEC)
+			if isWakeUpCommand {
+				log.Debug("Wake_up command detected, VCSEC session is sufficient")
+				log.Info("Connection to vehicle established (VCSEC only for wake_up)")
 			} else {
-				sleepStatus := vs.GetVehicleSleepStatus().String()
-				if strings.Contains(sleepStatus, "ASLEEP") {
-					log.Debug("Vehicle is asleep")
+				// Always check if the vehicle is awake before starting Infotainment session
+				log.Debug("Checking vehicle sleep status ...")
+				vs, err := car.BodyControllerState(ctx)
+				if err != nil {
+					log.Debug("Failed to get body controller state", "Error", err)
+					// If we can't check status and AutoWakeup is requested, try to wake up anyway
 					if firstCommand.AutoWakeup {
-						log.Debug("Waking up vehicle as requested ...")
+						log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
 						if err := car.Wakeup(ctx); err != nil {
 							return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 						}
-						log.Debug("Car successfully wakeup")
-					} else {
-						return nil, nil, false, fmt.Errorf("vehicle is sleeping")
-					}
-				} else if strings.Contains(sleepStatus, "AWAKE") {
-					log.Debug("Vehicle is already awake")
-				} else {
-					log.Debug("Vehicle sleep status unknown")
-					// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
-					if firstCommand.AutoWakeup {
-						log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
-						if err := car.Wakeup(ctx); err != nil {
-							log.Debug("Wakeup failed but continuing", "Error", err)
-						}
+						log.Debug("Car wakeup command sent")
 					} else {
 						return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
 					}
+				} else {
+					sleepStatus := vs.GetVehicleSleepStatus().String()
+					if strings.Contains(sleepStatus, "ASLEEP") {
+						log.Debug("Vehicle is asleep")
+						if firstCommand.AutoWakeup {
+							log.Debug("Waking up vehicle as requested ...")
+							if err := car.Wakeup(ctx); err != nil {
+								return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+							}
+							log.Debug("Car successfully wakeup")
+						} else {
+							return nil, nil, false, fmt.Errorf("vehicle is sleeping")
+						}
+					} else if strings.Contains(sleepStatus, "AWAKE") {
+						log.Debug("Vehicle is already awake")
+					} else {
+						log.Debug("Vehicle sleep status unknown")
+						// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
+						if firstCommand.AutoWakeup {
+							log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
+							if err := car.Wakeup(ctx); err != nil {
+								log.Debug("Wakeup failed but continuing", "Error", err)
+							}
+						} else {
+							return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
+						}
+					}
 				}
-			}
 
-			log.Debug("Starting Infotainment session ...")
-			// Then we can also connect the infotainment
-			if err := car.StartSession(ctx, []universalmessage.Domain{
-				protocol.DomainVCSEC,
-				protocol.DomainInfotainment,
-			}); err != nil {
-				return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+				log.Debug("Starting Infotainment session ...")
+				// Then we can also connect the infotainment
+				if err := car.StartSession(ctx, []universalmessage.Domain{
+					protocol.DomainVCSEC,
+					protocol.DomainInfotainment,
+				}); err != nil {
+					return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
+				}
+				log.Info("Connection to vehicle established")
 			}
-			log.Info("Connection to vehicle established")
 		}
 	} else {
 		log.Info("Key-Request connection established ...")
@@ -318,6 +327,22 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
 	if err != nil {
 		return cmd
+	}
+
+	// If wake_up command executed successfully, upgrade session to include Infotainment
+	// for subsequent commands that might need it
+	if firstCommand.Command == "wake_up" {
+		log.Debug("Wake_up executed successfully, upgrading session to include Infotainment for subsequent commands")
+		ctx, cancelUpgrade := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelUpgrade()
+		if err := car.StartSession(ctx, []universalmessage.Domain{
+			protocol.DomainVCSEC,
+			protocol.DomainInfotainment,
+		}); err != nil {
+			log.Debug("Failed to upgrade session to Infotainment, subsequent commands may fail", "Error", err)
+		} else {
+			log.Debug("Session upgraded to include Infotainment")
+		}
 	}
 
 	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {
