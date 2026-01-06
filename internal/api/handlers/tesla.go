@@ -18,6 +18,19 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
+// vehicleDataCacheEntry stores a cached endpoint data with timestamp
+type vehicleDataCacheEntry struct {
+	data      json.RawMessage // The JSON data for this specific endpoint
+	timestamp time.Time
+}
+
+// vehicleDataCache is a thread-safe cache for VehicleData endpoints
+// Key format: "VIN:endpoint" (e.g., "5YJ3E1EA1JF123456:charge_state")
+var (
+	vehicleDataCache    = make(map[string]*vehicleDataCacheEntry)
+	vehicleDataCacheMux sync.RWMutex
+)
+
 func commonDefer(w http.ResponseWriter, response *models.Response) {
 	var ret models.Ret
 	ret.Response = *response
@@ -103,6 +116,11 @@ func Command(w http.ResponseWriter, r *http.Request) {
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
 
+// generateVehicleDataCacheKey creates a unique cache key for a specific VIN and endpoint
+func generateVehicleDataCacheKey(vin string, endpoint string) string {
+	return vin + ":" + endpoint
+}
+
 func VehicleData(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, "VehicleData")
 	params := mux.Vars(r)
@@ -126,6 +144,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 			log.Error("Endpoint not supported", "Endpoint", endpoint)
 			response.Reason = fmt.Sprintf("The endpoint \"%s\" is not supported.", endpoint)
 			response.Result = false
+			commonDefer(w, &response)
 			return
 		}
 	}
@@ -136,6 +155,56 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheTime := time.Duration(config.AppConfig.VehicleDataCacheTime) * time.Second
+
+	// Check cache for each endpoint
+	vehicleDataCacheMux.RLock()
+	cachedData := make(map[string]json.RawMessage) // endpoint -> cached data
+	missingEndpoints := []string{}
+
+	for _, endpoint := range endpoints {
+		cacheKey := generateVehicleDataCacheKey(vin, endpoint)
+		cachedEntry, exists := vehicleDataCache[cacheKey]
+		if exists {
+			age := time.Since(cachedEntry.timestamp)
+			if age < cacheTime {
+				// Cache hit for this endpoint
+				cachedData[endpoint] = cachedEntry.data
+				log.Debug("VehicleData endpoint cache hit", "VIN", vin, "Endpoint", endpoint, "Age", age)
+			} else {
+				// Cache expired for this endpoint
+				log.Debug("VehicleData endpoint cache expired", "VIN", vin, "Endpoint", endpoint, "Age", age)
+				missingEndpoints = append(missingEndpoints, endpoint)
+			}
+		} else {
+			// Cache miss for this endpoint
+			log.Debug("VehicleData endpoint cache miss", "VIN", vin, "Endpoint", endpoint)
+			missingEndpoints = append(missingEndpoints, endpoint)
+		}
+	}
+	vehicleDataCacheMux.RUnlock()
+
+	// If all endpoints are cached, construct response from cache
+	if len(missingEndpoints) == 0 {
+		log.Debug("VehicleData fully served from cache", "VIN", vin)
+		// Build response from cached endpoints
+		combinedResponse := make(map[string]json.RawMessage)
+		for _, endpoint := range endpoints {
+			combinedResponse[endpoint] = cachedData[endpoint]
+		}
+		responseJson, err := json.Marshal(combinedResponse)
+		if err != nil {
+			response.Result = false
+			response.Reason = fmt.Sprintf("Failed to marshal cached response: %s", err)
+			return
+		}
+		response.Result = true
+		response.Reason = "The request was successfully processed."
+		response.Response = responseJson
+		return
+	}
+
+	// Some endpoints missing/expired - fetch from BLE
 	var apiResponse models.ApiResponse
 	wg := sync.WaitGroup{}
 	apiResponse.Wait = &wg
@@ -147,15 +216,68 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	wg.Wait()
 
-	SetCacheControl(w, config.AppConfig.CacheMaxAge)
-
 	if apiResponse.Result {
+		// Parse the BLE response to extract individual endpoint data
+		var fetchedData map[string]json.RawMessage
+		if err := json.Unmarshal(apiResponse.Response, &fetchedData); err != nil {
+			response.Result = false
+			response.Reason = fmt.Sprintf("Failed to unmarshal BLE response: %s", err)
+			return
+		}
+
+		// Store each endpoint separately in cache and merge with cached data
+		vehicleDataCacheMux.Lock()
+		combinedResponse := make(map[string]json.RawMessage)
+
+		// Add cached endpoints that are still valid
+		for endpoint, data := range cachedData {
+			combinedResponse[endpoint] = data
+		}
+
+		// Add freshly fetched endpoints and cache them
+		for endpoint, data := range fetchedData {
+			combinedResponse[endpoint] = data
+			cacheKey := generateVehicleDataCacheKey(vin, endpoint)
+			vehicleDataCache[cacheKey] = &vehicleDataCacheEntry{
+				data:      data,
+				timestamp: time.Now(),
+			}
+			log.Debug("VehicleData endpoint cached", "VIN", vin, "Endpoint", endpoint)
+		}
+		vehicleDataCacheMux.Unlock()
+
+		// Build final response combining cached and fresh data
+		responseJson, err := json.Marshal(combinedResponse)
+		if err != nil {
+			response.Result = false
+			response.Reason = fmt.Sprintf("Failed to marshal combined response: %s", err)
+			return
+		}
+
 		response.Result = true
 		response.Reason = "The request was successfully processed."
-		response.Response = apiResponse.Response
+		response.Response = responseJson
 	} else {
-		response.Result = false
-		response.Reason = apiResponse.Error
+		// BLE fetch failed - try to serve from cache if available
+		if len(cachedData) > 0 {
+			log.Debug("BLE fetch failed, serving partial data from cache", "VIN", vin, "CachedEndpoints", len(cachedData))
+			combinedResponse := make(map[string]json.RawMessage)
+			for endpoint, data := range cachedData {
+				combinedResponse[endpoint] = data
+			}
+			responseJson, err := json.Marshal(combinedResponse)
+			if err != nil {
+				response.Result = false
+				response.Reason = apiResponse.Error
+				return
+			}
+			response.Result = true
+			response.Reason = "The request was partially processed from cache. Some data may be stale."
+			response.Response = responseJson
+		} else {
+			response.Result = false
+			response.Reason = apiResponse.Error
+		}
 	}
 }
 

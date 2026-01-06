@@ -170,6 +170,8 @@ Explicitly wake up the vehicle:
 
 The vehicle data is fetched from the vehicle and returned in the response in the same format as the [Fleet API](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-endpoints#vehicle-data). Since a ble connection has to be established to fetch the data, it takes a few seconds before the data is returned.
 
+**Caching:** VehicleData responses are cached in memory for faster subsequent requests. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN. The cache time can be configured via the `vehicleDataCacheTime` environment variable (default: 30 seconds). If all requested endpoints are cached and valid, the response is returned immediately without establishing a BLE connection.
+
 **Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter.
 
 #### Example Request

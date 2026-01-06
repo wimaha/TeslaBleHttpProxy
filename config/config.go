@@ -14,10 +14,11 @@ var PrivateKeyFile = "key/private.pem"
 var Version = "*undefined*"
 
 type Config struct {
-	LogLevel          string
-	HttpListenAddress string
-	ScanTimeout       int // Seconds to scan for BLE devices
-	CacheMaxAge       int // Seconds to cache BLE responses
+	LogLevel             string
+	HttpListenAddress    string
+	ScanTimeout          int // Seconds to scan for BLE devices
+	CacheMaxAge          int // Seconds for HTTP Cache-Control header max-age (used for body controller state responses). If set to 0, cache headers are disabled.
+	VehicleDataCacheTime int // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
 }
 
 var AppConfig *Config
@@ -60,11 +61,23 @@ func LoadConfig() *Config {
 	}
 	log.Info("Env:", "scanTimeout", scanTimeoutInt)
 
+	vehicleDataCacheTime := os.Getenv("vehicleDataCacheTime")
+	if vehicleDataCacheTime == "" {
+		vehicleDataCacheTime = "30" // default value: 30 seconds
+	}
+	vehicleDataCacheTimeInt, err := strconv.Atoi(vehicleDataCacheTime)
+	if err != nil {
+		log.Error("Invalid vehicleDataCacheTime value, using default (30)", "error", err)
+		vehicleDataCacheTimeInt = 30
+	}
+	log.Info("Env:", "vehicleDataCacheTime", vehicleDataCacheTimeInt)
+
 	return &Config{
-		LogLevel:          envLogLevel,
-		HttpListenAddress: addr,
-		CacheMaxAge:       cacheMaxAgeInt,
-		ScanTimeout:       scanTimeoutInt,
+		LogLevel:             envLogLevel,
+		HttpListenAddress:    addr,
+		CacheMaxAge:          cacheMaxAgeInt,
+		ScanTimeout:          scanTimeoutInt,
+		VehicleDataCacheTime: vehicleDataCacheTimeInt,
 	}
 }
 
