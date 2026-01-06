@@ -139,7 +139,7 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 
 By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`.
 
-**Wake Up Behavior:** By default, the car is **not** automatically woken up before executing commands. If your vehicle is asleep and you need to wake it up before executing a command, you can use the `wakeup=true` parameter. Alternatively, you can explicitly call the `wake_up` command first.
+**Wake Up Behavior:** Commands **automatically wake up** the vehicle if it is asleep. You don't need to manually wake the vehicle or use any parameters - the proxy handles this automatically to ensure commands execute successfully.
 
 #### Example Request
 
@@ -150,12 +150,6 @@ Start charging:
 
 Start charging and wait for the command to complete:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start?wait=true`
-
-Start charging with automatic wakeup:
-`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start?wakeup=true`
-
-Start charging with both wait and wakeup:
-`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start?wait=true&wakeup=true`
 
 Stop charging:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/charge_stop`
@@ -172,7 +166,7 @@ The vehicle data is fetched from the vehicle and returned in the response in the
 
 **Caching:** VehicleData responses are cached in memory for faster subsequent requests. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN. The cache time can be configured via the `vehicleDataCacheTime` environment variable (default: 30 seconds). If all requested endpoints are cached and valid, the response is returned immediately without establishing a BLE connection.
 
-**Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter.
+**Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. This allows for efficient data retrieval when the vehicle is already awake. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter. The proxy uses intelligent caching to minimize unnecessary wakeup calls - if the vehicle was confirmed awake within the last 9 minutes, the sleep status check is skipped.
 
 #### Example Request
 
