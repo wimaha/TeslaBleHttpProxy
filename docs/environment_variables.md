@@ -8,7 +8,7 @@ This is the log level. Options: debug (Default: info)
 
 ## scanTimeout
 
-This is the number of seconds to scan for BLE devices. If set to 0, the scan will continue until a device is found or the context is cancelled. (Default: 2)
+This is the number of seconds to scan for BLE devices. If set to 0, the scan will continue until a device is found or the context is cancelled. (Default: 5)
 
 ## cacheMaxAge
 

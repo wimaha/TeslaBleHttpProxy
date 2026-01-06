@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/log"
@@ -38,6 +39,10 @@ type BleControl struct {
 
 	commandStack  chan commands.Command
 	providerStack chan commands.Command
+
+	// Cache to track when each vehicle was last confirmed awake
+	lastAwakeTime map[string]time.Time
+	awakeTimeMu   sync.RWMutex
 }
 
 func NewBleControl() (*BleControl, error) {
@@ -53,6 +58,7 @@ func NewBleControl() (*BleControl, error) {
 		privateKey:    privateKey,
 		commandStack:  make(chan commands.Command, 50),
 		providerStack: make(chan commands.Command),
+		lastAwakeTime: make(map[string]time.Time),
 	}, nil
 }
 
@@ -88,6 +94,28 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 		Response:   response,
 		AutoWakeup: autoWakeup,
 	}
+}
+
+// shouldCheckSleepStatus returns true if we need to check the vehicle's sleep status
+// (i.e., if it's been more than 9 minutes since we last confirmed it was awake)
+func (bc *BleControl) shouldCheckSleepStatus(vin string) bool {
+	bc.awakeTimeMu.RLock()
+	lastAwake, exists := bc.lastAwakeTime[vin]
+	bc.awakeTimeMu.RUnlock()
+
+	if !exists {
+		return true // No cache entry, need to check
+	}
+
+	// Check if it's been more than 9 minutes
+	return time.Since(lastAwake) > 9*time.Minute
+}
+
+// markVehicleAwake records that the vehicle was confirmed awake at this time
+func (bc *BleControl) markVehicleAwake(vin string) {
+	bc.awakeTimeMu.Lock()
+	bc.lastAwakeTime[vin] = time.Now()
+	bc.awakeTimeMu.Unlock()
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
@@ -254,48 +282,64 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 				log.Debug("Wake_up command detected, VCSEC session is sufficient")
 				log.Info("Connection to vehicle established (VCSEC only for wake_up)")
 			} else {
-				// Always check if the vehicle is awake before starting Infotainment session
-				log.Debug("Checking vehicle sleep status ...")
-				vs, err := car.BodyControllerState(ctx)
-				if err != nil {
-					log.Debug("Failed to get body controller state", "Error", err)
-					// If we can't check status and AutoWakeup is requested, try to wake up anyway
-					if firstCommand.AutoWakeup {
-						log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
-						if err := car.Wakeup(ctx); err != nil {
-							return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
-						}
-						log.Debug("Car wakeup command sent")
-					} else {
-						return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
-					}
-				} else {
-					sleepStatus := vs.GetVehicleSleepStatus().String()
-					if strings.Contains(sleepStatus, "ASLEEP") {
-						log.Debug("Vehicle is asleep")
+				// Check if we need to verify the vehicle's sleep status
+				// Only check if it's been more than 9 minutes since we last confirmed it was awake
+				needToCheck := bc.shouldCheckSleepStatus(firstCommand.Vin)
+
+				if needToCheck {
+					log.Debug("Checking vehicle sleep status (cache expired or not available) ...")
+					vs, err := car.BodyControllerState(ctx)
+					if err != nil {
+						log.Debug("Failed to get body controller state", "Error", err)
+						// If we can't check status and AutoWakeup is requested, try to wake up anyway
 						if firstCommand.AutoWakeup {
-							log.Debug("Waking up vehicle as requested ...")
+							log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
 							if err := car.Wakeup(ctx); err != nil {
 								return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 							}
-							log.Debug("Car successfully wakeup")
-						} else {
-							return nil, nil, false, fmt.Errorf("vehicle is sleeping")
-						}
-					} else if strings.Contains(sleepStatus, "AWAKE") {
-						log.Debug("Vehicle is already awake")
-					} else {
-						log.Debug("Vehicle sleep status unknown")
-						// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
-						if firstCommand.AutoWakeup {
-							log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
-							if err := car.Wakeup(ctx); err != nil {
-								log.Debug("Wakeup failed but continuing", "Error", err)
-							}
+							log.Debug("Car wakeup command sent")
+							// Mark as awake after successful wakeup
+							bc.markVehicleAwake(firstCommand.Vin)
 						} else {
 							return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
 						}
+					} else {
+						sleepStatus := vs.GetVehicleSleepStatus().String()
+						if strings.Contains(sleepStatus, "ASLEEP") {
+							log.Debug("Vehicle is asleep")
+							if firstCommand.AutoWakeup {
+								log.Debug("Waking up vehicle as requested ...")
+								if err := car.Wakeup(ctx); err != nil {
+									return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+								}
+								log.Debug("Car successfully wakeup")
+								// Mark as awake after successful wakeup
+								bc.markVehicleAwake(firstCommand.Vin)
+							} else {
+								return nil, nil, false, fmt.Errorf("vehicle is sleeping")
+							}
+						} else if strings.Contains(sleepStatus, "AWAKE") {
+							log.Debug("Vehicle is already awake")
+							// Update cache - vehicle is confirmed awake
+							bc.markVehicleAwake(firstCommand.Vin)
+						} else {
+							log.Debug("Vehicle sleep status unknown")
+							// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
+							if firstCommand.AutoWakeup {
+								log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
+								if err := car.Wakeup(ctx); err != nil {
+									log.Debug("Wakeup failed but continuing", "Error", err)
+								} else {
+									// Mark as awake after successful wakeup
+									bc.markVehicleAwake(firstCommand.Vin)
+								}
+							} else {
+								return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
+							}
+						}
 					}
+				} else {
+					log.Debug("Skipping sleep status check (vehicle was awake less than 9 minutes ago)")
 				}
 
 				log.Debug("Starting Infotainment session ...")
