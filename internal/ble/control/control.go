@@ -246,12 +246,47 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		}
 
 		if firstCommand.Domain != commands.Domain.VCSEC {
-			// Wake up the car if requested
-			if firstCommand.AutoWakeup {
-				if err := car.Wakeup(ctx); err != nil {
-					return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+			// Always check if the vehicle is awake before starting Infotainment session
+			log.Debug("Checking vehicle sleep status ...")
+			vs, err := car.BodyControllerState(ctx)
+			if err != nil {
+				log.Debug("Failed to get body controller state", "Error", err)
+				// If we can't check status and AutoWakeup is requested, try to wake up anyway
+				if firstCommand.AutoWakeup {
+					log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
+					if err := car.Wakeup(ctx); err != nil {
+						return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+					}
+					log.Debug("Car wakeup command sent")
 				} else {
-					log.Debug("Car successfully wakeup")
+					return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
+				}
+			} else {
+				sleepStatus := vs.GetVehicleSleepStatus().String()
+				if strings.Contains(sleepStatus, "ASLEEP") {
+					log.Debug("Vehicle is asleep")
+					if firstCommand.AutoWakeup {
+						log.Debug("Waking up vehicle as requested ...")
+						if err := car.Wakeup(ctx); err != nil {
+							return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
+						}
+						log.Debug("Car successfully wakeup")
+					} else {
+						return nil, nil, false, fmt.Errorf("vehicle is sleeping")
+					}
+				} else if strings.Contains(sleepStatus, "AWAKE") {
+					log.Debug("Vehicle is already awake")
+				} else {
+					log.Debug("Vehicle sleep status unknown")
+					// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
+					if firstCommand.AutoWakeup {
+						log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
+						if err := car.Wakeup(ctx); err != nil {
+							log.Debug("Wakeup failed but continuing", "Error", err)
+						}
+					} else {
+						return nil, nil, false, fmt.Errorf("vehicle sleep status unknown and wakeup not requested")
+					}
 				}
 			}
 
