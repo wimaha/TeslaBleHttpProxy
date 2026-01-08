@@ -206,12 +206,29 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 	var err error
 	log.Debug("Scanning for vehicle ...")
-	// Vehicle sends a beacon every ~200ms, so if it is not found in (scanTimeout=2) seconds, it is likely not in range and not worth retrying.
+	// Vehicle sends a beacon every ~200ms, so if it is not found in scanTimeout seconds, it is likely not in range and not worth retrying.
+	// The scan context is created independently to ensure it gets the full scanTimeout duration,
+	// regardless of how much time remains on the parent context.
 	scanTimeout := config.AppConfig.ScanTimeout
 	var scanCtx context.Context
 	var cancelScan context.CancelFunc
 	if scanTimeout > 0 {
-		scanCtx, cancelScan = context.WithTimeout(ctx, time.Duration(scanTimeout)*time.Second)
+		// Create scan context with full timeout duration, but also respect parent context cancellation
+		// This ensures the scan gets the full scanTimeout seconds, not limited by parent context's remaining time
+		baseCtx := context.Background()
+		scanCtx, cancelScan = context.WithTimeout(baseCtx, time.Duration(scanTimeout)*time.Second)
+		// Also cancel scan if parent context is cancelled (to allow early termination)
+		parentDone := ctx.Done()
+		if parentDone != nil {
+			go func() {
+				select {
+				case <-parentDone:
+					cancelScan()
+				case <-scanCtx.Done():
+					// Scan completed or timed out, exit goroutine
+				}
+			}()
+		}
 	} else {
 		scanCtx, cancelScan = context.WithCancel(ctx)
 	}
