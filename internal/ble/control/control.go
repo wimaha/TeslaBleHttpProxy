@@ -164,10 +164,10 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 		}
 		log.Debugf("Connecting to vehicle (Attempt %d) ...", i+1)
 		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
-		defer cancel()
 		conn, car, retry, err := bc.TryConnectToVehicle(ctx, firstCommand)
 		if err == nil {
-			//Successful
+			//Successful - cancel the connection attempt context since we're done with it
+			cancel()
 			defer conn.Close()
 			//defer log.Debug("close connection (A)")
 			defer car.Disconnect()
@@ -175,9 +175,12 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			cmd := bc.operateConnection(car, firstCommand)
 			return cmd
 		} else if !retry || parentCtx.Err() != nil {
-			//Failed but no retry possible
+			//Failed but no retry possible - cancel context before returning
+			cancel()
 			return commandError(err)
 		} else {
+			// Will retry - cancel this attempt's context before next iteration
+			cancel()
 			lastErr = err
 		}
 	}
@@ -206,12 +209,27 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 	var err error
 	log.Debug("Scanning for vehicle ...")
-	// Vehicle sends a beacon every ~200ms, so if it is not found in (scanTimeout=2) seconds, it is likely not in range and not worth retrying.
+	// Vehicle sends a beacon every ~200ms, so if it is not found in scanTimeout seconds, it is likely not in range and not worth retrying.
+	// The scan context is created independently to ensure it gets the full scanTimeout duration,
+	// regardless of how much time remains on the parent context.
 	scanTimeout := config.AppConfig.ScanTimeout
 	var scanCtx context.Context
 	var cancelScan context.CancelFunc
 	if scanTimeout > 0 {
-		scanCtx, cancelScan = context.WithTimeout(ctx, time.Duration(scanTimeout)*time.Second)
+		// Create scan context with full timeout duration, but also respect parent context cancellation
+		// This ensures the scan gets the full scanTimeout seconds, not limited by parent context's remaining time
+		baseCtx := context.Background()
+		scanCtx, cancelScan = context.WithTimeout(baseCtx, time.Duration(scanTimeout)*time.Second)
+		// Also cancel scan if parent context is cancelled (to allow early termination)
+		// ctx.Done() always returns a non-nil channel, so no nil check needed
+		go func() {
+			select {
+			case <-ctx.Done():
+				cancelScan()
+			case <-scanCtx.Done():
+				// Scan completed or timed out, exit goroutine
+			}
+		}()
 	} else {
 		scanCtx, cancelScan = context.WithCancel(ctx)
 	}
