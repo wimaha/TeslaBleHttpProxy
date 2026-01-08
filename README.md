@@ -16,7 +16,7 @@ The program stores the received requests in a queue and processes them one by on
   - [Vehicle Data](#vehicle-data)
   - [Body Controller State](#body-controller-state)
   - [Version of Proxy](#version-of-proxy)
-- [Vehicle and Connection Requirements](#vehicle-and-connection-requirements)
+- [Troubleshooting](#troubleshooting)
 
 ## How to install
 
@@ -224,8 +224,22 @@ Get version of proxy:
 
 The response will contain the version of the proxy.
 
-## Vehicle and Connection Requirements
+## Troubleshooting
+
+### Vehicle Requirements
 
 TeslaBleHttpProxy requires your Tesla vehicle to support **Phone Key** functionality, as it relies on Bluetooth Low Energy (BLE) for communication. Most Tesla models from 2021 onward support Phone Key, but some older models (e.g., Model X 2015–2020) may not. Please verify Phone Key support in your Tesla app or consult Tesla's [Vehicle Keys Support Page](https://www.tesla.com/support/tesla-vehicle-keys) before setting up the proxy.
 
+### Connection Timeouts
+
 Due to BLE's power-saving design, Tesla vehicles may terminate connections after ~30 seconds, causing "connection timeout" logs. This is normal, and the proxy reconnects automatically, ensuring EVCC or other integrations work without issues. Keep the proxy device within ~5-10 meters of the vehicle for reliable connections.
+
+### BLE Device Limit (Maximum 3 Devices)
+
+**Problem:** Intermittent connection failures, undefined loss of connections, or unreliable behavior with evcc.
+
+**Solution:** Tesla vehicles only accept a **maximum of 3 BLE keys/devices simultaneously**. If you exceed this limit (e.g., multiple phones, smartwatches, and the proxy), you'll experience connection issues.
+
+**Fix:** Close the Tesla app on mobile phones when not needed, especially if you're also wearing a smartwatch with the Tesla app. The proxy counts as one device, so limit other active BLE connections accordingly.
+
+This is a Tesla vehicle constraint, not a limitation of TeslaBleHttpProxy.
