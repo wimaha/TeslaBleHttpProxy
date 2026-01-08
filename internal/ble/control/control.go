@@ -238,7 +238,8 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	scanResult, err := ble.ScanVehicleBeacon(scanCtx, firstCommand.Vin)
 	if err != nil {
 		if scanCtx.Err() != nil {
-			return nil, nil, false, fmt.Errorf("Vehicle is not in range: %s", err)
+			// Scan timed out - allow retry as vehicle might be temporarily out of range or experiencing transient BLE issues
+			return nil, nil, true, fmt.Errorf("Vehicle is not in range: %s", err)
 		} else {
 			if strings.Contains(err.Error(), "operation not permitted") {
 				// The underlying BLE package calls HCIDEVDOWN on the BLE device, presumably as a
