@@ -164,10 +164,10 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 		}
 		log.Debugf("Connecting to vehicle (Attempt %d) ...", i+1)
 		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
-		defer cancel()
 		conn, car, retry, err := bc.TryConnectToVehicle(ctx, firstCommand)
 		if err == nil {
-			//Successful
+			//Successful - cancel the connection attempt context since we're done with it
+			cancel()
 			defer conn.Close()
 			//defer log.Debug("close connection (A)")
 			defer car.Disconnect()
@@ -175,9 +175,12 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			cmd := bc.operateConnection(car, firstCommand)
 			return cmd
 		} else if !retry || parentCtx.Err() != nil {
-			//Failed but no retry possible
+			//Failed but no retry possible - cancel context before returning
+			cancel()
 			return commandError(err)
 		} else {
+			// Will retry - cancel this attempt's context before next iteration
+			cancel()
 			lastErr = err
 		}
 	}
@@ -218,17 +221,15 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		baseCtx := context.Background()
 		scanCtx, cancelScan = context.WithTimeout(baseCtx, time.Duration(scanTimeout)*time.Second)
 		// Also cancel scan if parent context is cancelled (to allow early termination)
-		parentDone := ctx.Done()
-		if parentDone != nil {
-			go func() {
-				select {
-				case <-parentDone:
-					cancelScan()
-				case <-scanCtx.Done():
-					// Scan completed or timed out, exit goroutine
-				}
-			}()
-		}
+		// ctx.Done() always returns a non-nil channel, so no nil check needed
+		go func() {
+			select {
+			case <-ctx.Done():
+				cancelScan()
+			case <-scanCtx.Done():
+				// Scan completed or timed out, exit goroutine
+			}
+		}()
 	} else {
 		scanCtx, cancelScan = context.WithCancel(ctx)
 	}
