@@ -7,22 +7,60 @@ body {
 }
 
 .container {
-    max-width: 400px;
+    max-width: 500px;
     margin: 0 auto;
     background-color: #fff;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    padding: 20px;
-    margin-top: 20px;
+    border-radius: 8px;
+    padding: 24px;
+    margin-top: 24px;
+    margin-bottom: 24px;
+}
+
+.message-container {
+    max-width: 500px;
+    margin: 0 auto;
+    margin-top: 24px;
+    margin-bottom: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    border: none;
 }
 
 .header {
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f0f0f0;
 }
 
 h1 {
-    font-size: 24px;
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+}
+
+h2 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    line-height: 1.4;
+}
+
+h3 {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+}
+
+h4 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    line-height: 1.5;
 }
 
 .version {
@@ -101,12 +139,13 @@ input:checked + .slider:before {
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid #ccc;
-    padding: 10px 0;
-    min-height: 35px;
+    padding: 16px 0;
+    min-height: 48px;
 }
 
 .setting span {
     font-size: 16px;
+    line-height: 1.6;
     flex: 1;
 }
 
@@ -148,12 +187,13 @@ input:checked + .slider:before {
     border: none;
     border-bottom: 1px solid #ccc;
     font-size: 16px;
-    padding: 5px;
+    padding: 8px 4px;
     background-color: #f3f3f3;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
     display: inline-block;
+    min-width: 200px;
 }
 
 .dropdown-horizontal option {
@@ -187,37 +227,44 @@ input:checked + .slider:before {
     background-color: #ff9900;
 }
 
-/* Fehlermeldung */
-.message.error {
-    background-color: #ff0000; /* Rotes Fehler-Design */
-    color: #fff;
-    padding: 10px;
-    margin: 10px 0;
+/* Message boxes - matching warning-text style */
+.message-box {
+    border-left: 4px solid;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 12px 0;
+    line-height: 1.6;
 }
 
-/* Erfolgsmeldung */
-.message.success {
-    background-color: #00cc00; /* Grünes Erfolg-Design */
-    color: #fff;
-    padding: 10px;
-    margin: 10px 0;
+.message-box p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
 }
 
-/* Hinweismeldung */
-.message.info {
-    background-color: #3333cc; /* Blaues Hinweis-Design */
-    color: #fff;
-    padding: 10px;
-    margin: 10px 0;
+.message-box strong {
+    font-weight: 600;
 }
 
-.message h2 {
-    font-size: 18px;
-    margin-bottom: 5px;
+/* Error message */
+.error-message {
+    background-color: #ffebee;
+    border-left-color: #f44336;
+    color: #c62828;
 }
 
-.message p {
-    font-size: 16px;
+/* Success message */
+.success-message {
+    background-color: #e8f5e9;
+    border-left-color: #4caf50;
+    color: #2e7d32;
+}
+
+/* Info message */
+.info-message {
+    background-color: #e3f2fd;
+    border-left-color: #2196F3;
+    color: #1565c0;
 }
 
 /* Geplante Einstellungen */
@@ -257,9 +304,107 @@ input:checked + .slider:before {
 
 .add-setting {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
     margin-top: 20px;
+    margin-bottom: 16px;
+}
+
+.add-setting p {
+    margin: 8px 0;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.description-text {
+    color: #555;
+    line-height: 1.7;
+    margin: 8px 0 0 0;
+}
+
+.warning-text {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 12px 0;
+    color: #856404;
+    line-height: 1.6;
+}
+
+.no-keys-message {
+    background-color: #e3f2fd;
+    border-left: 4px solid #2196F3;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 12px 0;
+    color: #1565c0;
+}
+
+.key-roles-info {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 16px;
+    margin-top: 20px;
+}
+
+.role-list {
+    text-align: left;
+    margin: 12px 0;
+    padding-left: 24px;
+    line-height: 1.8;
+}
+
+.role-list li {
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.security-note {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #dee2e6;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.migration-note {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #dee2e6;
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.active-badge {
+    color: #28a745;
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.not-generated {
+    color: #999;
+    font-size: 15px;
+}
+
+.small-button {
+    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 4px;
+}
+
+.remove-button {
+    background-color: #d32f2f;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.remove-button:hover {
+    background-color: #b71c1c;
 }
 
 .add-setting input {
@@ -267,7 +412,8 @@ input:checked + .slider:before {
     border: none;
     border-bottom: 1px solid #ccc;
     font-size: 16px;
-    padding: 5px;
+    padding: 8px 4px;
+    line-height: 1.5;
 }
 
 .delete-button {
@@ -304,6 +450,10 @@ input:checked + .slider:before {
         background-color: #000;
     }
 
+    .message-container {
+        background: transparent;
+    }
+
     .setting {
         border-bottom: 1px solid #ccc;
     }
@@ -319,5 +469,58 @@ input:checked + .slider:before {
 
     .save-button {
         background-color: #800;
+    }
+
+    .description-text {
+        color: #bbb;
+    }
+
+    .warning-text {
+        background-color: #4a3a00;
+        border-left-color: #ffc107;
+        color: #ffd54f;
+    }
+
+    .no-keys-message {
+        background-color: #0d47a1;
+        border-left-color: #2196F3;
+        color: #90caf9;
+    }
+
+    .key-roles-info {
+        background-color: #1a1a1a;
+        border-color: #444;
+    }
+
+    .security-note {
+        border-top-color: #444;
+        color: #aaa;
+    }
+
+    .migration-note {
+        border-top-color: #444;
+        color: #aaa;
+    }
+
+    .not-generated {
+        color: #777;
+    }
+
+    .error-message {
+        background-color: #4a1a1a;
+        border-left-color: #f44336;
+        color: #ffcdd2;
+    }
+
+    .success-message {
+        background-color: #1b3a1b;
+        border-left-color: #4caf50;
+        color: #a5d6a7;
+    }
+
+    .info-message {
+        background-color: #0d47a1;
+        border-left-color: #2196F3;
+        color: #90caf9;
     }
 }

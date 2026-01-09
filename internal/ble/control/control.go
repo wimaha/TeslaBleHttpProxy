@@ -48,11 +48,16 @@ type BleControl struct {
 func NewBleControl() (*BleControl, error) {
 	var privateKey protocol.ECDHPrivateKey
 	var err error
-	if privateKey, err = protocol.LoadPrivateKey(config.PrivateKeyFile); err != nil {
+
+	// Get active key files
+	privateKeyFile, _ := config.GetActiveKeyFiles()
+
+	// Load private key (protected by UNIX file permissions)
+	if privateKey, err = LoadPrivateKey(privateKeyFile); err != nil {
 		log.Error("Failed to load private key.", "err", err)
 		return nil, fmt.Errorf("Failed to load private key: %s", err)
 	}
-	log.Debug("PrivateKeyFile loaded", "PrivateKeyFile", config.PrivateKeyFile)
+	log.Debug("PrivateKeyFile loaded", "PrivateKeyFile", privateKeyFile, "Role", GetActiveKeyRole())
 
 	return &BleControl{
 		privateKey:    privateKey,

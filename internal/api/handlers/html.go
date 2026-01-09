@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
-	"os"
 	"text/template"
 
 	"github.com/charmbracelet/log"
@@ -14,9 +13,16 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
 )
 
+type KeyInfo struct {
+	Role        string
+	DisplayName string
+	IsActive    bool
+	Exists      bool
+}
+
 type DashboardParams struct {
-	PrivateKey    string
-	PublicKey     string
+	Keys          []KeyInfo
+	ActiveKeyRole string
 	ShouldGenKeys bool
 	Messages      []models.Message
 	Version       string
@@ -24,24 +30,30 @@ type DashboardParams struct {
 
 func ShowDashboard(html fs.FS) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var shouldGenKeys = true
-		var privateKey = "- missing -"
-		if _, err := os.Stat(config.PrivateKeyFile); err == nil {
-			privateKey = "private.pem"
-			shouldGenKeys = false
+		// Get all available keys
+		availableRoles := control.ListAvailableKeys()
+		activeRole := control.GetActiveKeyRole()
+
+		// Build key info list (exclude legacy - it's automatically migrated)
+		allRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
+		keys := make([]KeyInfo, 0)
+
+		for _, role := range allRoles {
+			exists := control.KeyExists(role)
+			keys = append(keys, KeyInfo{
+				Role:        role,
+				DisplayName: control.GetKeyRoleDisplayName(role),
+				IsActive:    role == activeRole,
+				Exists:      exists,
+			})
 		}
 
-		var publicKey = "- missing -"
-		if _, err := os.Stat(config.PublicKeyFile); err == nil {
-			publicKey = "public.pem"
-			shouldGenKeys = false
-		}
-
+		shouldGenKeys := len(availableRoles) == 0
 		messages := models.MainMessageStack.PopAll()
 
 		p := DashboardParams{
-			PrivateKey:    privateKey,
-			PublicKey:     publicKey,
+			Keys:          keys,
+			ActiveKeyRole: activeRole,
 			ShouldGenKeys: shouldGenKeys,
 			Messages:      messages,
 			Version:       config.Version,
@@ -53,13 +65,40 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 }
 
 func GenKeys(w http.ResponseWriter, r *http.Request) {
-	err := control.CreatePrivateAndPublicKeyFile()
+	// Get role from query parameter
+	role := r.URL.Query().Get("role")
+	if role == "" {
+		role = control.KeyRoleOwner // Default to owner
+	}
+
+	// Validate role to prevent path traversal
+	validatedRole, validationErr := control.ValidateRole(role)
+	if validationErr != nil {
+		models.MainMessageStack.Push(models.Message{
+			Title:   "Error",
+			Message: validationErr.Error(),
+			Type:    models.Error,
+		})
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+	role = validatedRole
+
+	err := control.CreatePrivateAndPublicKeyFileForRole(role)
 
 	if err == nil {
+		// Set as active key if no active key exists
+		activeRole := control.GetActiveKeyRole()
+		if activeRole == "" || !control.KeyExists(activeRole) {
+			if err := control.SetActiveKeyRole(role); err != nil {
+				log.Warn("Failed to set active key role", "error", err)
+			}
+		}
+
 		control.SetupBleControl()
 		models.MainMessageStack.Push(models.Message{
 			Title:   "Success",
-			Message: "Keys successfully generated and saved.",
+			Message: fmt.Sprintf("Keys for role '%s' successfully generated and saved.", control.GetKeyRoleDisplayName(role)),
 			Type:    models.Success,
 		})
 	} else {
@@ -73,8 +112,35 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func RemoveKeys(w http.ResponseWriter, r *http.Request) {
-	err1, err2 := control.RemoveKeyFiles()
+	// Get role from query parameter
+	role := r.URL.Query().Get("role")
 
+	// Role is required (legacy keys are automatically migrated)
+	if role == "" {
+		models.MainMessageStack.Push(models.Message{
+			Title:   "Error",
+			Message: "Role parameter is required. Legacy keys are automatically migrated to Owner role on startup.",
+			Type:    models.Error,
+		})
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+
+	// Validate role to prevent path traversal
+	validatedRole, err := control.ValidateRole(role)
+	if err != nil {
+		models.MainMessageStack.Push(models.Message{
+			Title:   "Error",
+			Message: err.Error(),
+			Type:    models.Error,
+		})
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+	role = validatedRole
+
+	// Remove role-based keys
+	err1, err2 := control.RemoveKeyFilesForRole(role)
 	if err1 != nil {
 		models.MainMessageStack.Push(models.Message{
 			Title:   "Error",
@@ -92,12 +158,45 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 	if err1 == nil && err2 == nil {
 		models.MainMessageStack.Push(models.Message{
 			Title:   "Success",
-			Message: "Keys successfully removed.",
+			Message: fmt.Sprintf("Keys for role '%s' successfully removed.", control.GetKeyRoleDisplayName(role)),
 			Type:    models.Success,
 		})
+
+		// If removed key was active, try to activate another key
+		if control.GetActiveKeyRole() == role {
+			availableKeys := control.ListAvailableKeys()
+			if len(availableKeys) > 0 {
+				// Activate first available key (skip legacy/empty role if present)
+				var newActiveRole string
+				for _, key := range availableKeys {
+					if key != "" {
+						newActiveRole = key
+						break
+					}
+				}
+				// Fallback to owner if no valid role found
+				if newActiveRole == "" {
+					newActiveRole = control.KeyRoleOwner
+				}
+				if err := control.SetActiveKeyRole(newActiveRole); err == nil {
+					models.MainMessageStack.Push(models.Message{
+						Title:   "Info",
+						Message: fmt.Sprintf("Active key changed to '%s'.", control.GetKeyRoleDisplayName(newActiveRole)),
+						Type:    models.Info,
+					})
+				}
+			} else {
+				models.MainMessageStack.Push(models.Message{
+					Title:   "Warning",
+					Message: "No keys remaining. Please generate a new key to continue using the proxy.",
+					Type:    models.Info,
+				})
+			}
+		}
 	}
 
 	control.CloseBleControl()
+	control.SetupBleControl() // Reinitialize with new active key
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -112,6 +211,7 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		vin := r.FormValue("VIN")
+		role := r.FormValue("role")
 
 		if vin == "" {
 			models.MainMessageStack.Push(models.Message{
@@ -122,7 +222,40 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err := control.SendKeysToVehicle(vin)
+		// Validate role if provided
+		if role != "" {
+			// Validate role to prevent path traversal
+			validatedRole, err := control.ValidateRole(role)
+			if err != nil {
+				models.MainMessageStack.Push(models.Message{
+					Title:   "Error",
+					Message: err.Error(),
+					Type:    models.Error,
+				})
+				return
+			}
+			role = validatedRole
+
+			// Check if keys exist for this role
+			if !control.KeyExists(role) {
+				models.MainMessageStack.Push(models.Message{
+					Title:   "Error",
+					Message: fmt.Sprintf("Keys for role '%s' do not exist.", control.GetKeyRoleDisplayName(role)),
+					Type:    models.Error,
+				})
+				return
+			}
+		} else {
+			// Use active key role if no role specified
+			activeRole := control.GetActiveKeyRole()
+			// Ensure active role is not legacy (should have been migrated)
+			if activeRole == "" {
+				activeRole = control.KeyRoleOwner
+			}
+			role = activeRole
+		}
+
+		err := control.SendKeysToVehicle(vin, role)
 
 		if err != nil {
 			models.MainMessageStack.Push(models.Message{
@@ -133,11 +266,63 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 		} else {
 			models.MainMessageStack.Push(models.Message{
 				Title:   "Success",
-				Message: fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", vin),
+				Message: fmt.Sprintf("Sent add-key request to %s with role '%s'. Confirm by tapping NFC card on center console.", vin, control.GetKeyRoleDisplayName(role)),
 				Type:    models.Success,
 			})
 		}
 	}
+}
+
+func ActivateKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		role := r.FormValue("role")
+
+		// Validate role to prevent path traversal
+		validatedRole, err := control.ValidateRole(role)
+		if err != nil {
+			models.MainMessageStack.Push(models.Message{
+				Title:   "Error",
+				Message: err.Error(),
+				Type:    models.Error,
+			})
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			return
+		}
+		role = validatedRole
+
+		// Check if keys exist
+		if !control.KeyExists(role) {
+			models.MainMessageStack.Push(models.Message{
+				Title:   "Error",
+				Message: fmt.Sprintf("Keys for role '%s' do not exist.", control.GetKeyRoleDisplayName(role)),
+				Type:    models.Error,
+			})
+			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+			return
+		}
+
+		if err := control.SetActiveKeyRole(role); err != nil {
+			models.MainMessageStack.Push(models.Message{
+				Title:   "Error",
+				Message: err.Error(),
+				Type:    models.Error,
+			})
+		} else {
+			models.MainMessageStack.Push(models.Message{
+				Title:   "Success",
+				Message: fmt.Sprintf("Active key changed to '%s'.", control.GetKeyRoleDisplayName(role)),
+				Type:    models.Success,
+			})
+			// Reinitialize BLE control with new active key
+			control.CloseBleControl()
+			control.SetupBleControl()
+		}
+	}
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 func parse(file string, html fs.FS) *template.Template {

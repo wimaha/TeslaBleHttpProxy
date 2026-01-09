@@ -1,14 +1,86 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/log"
 )
 
+// Legacy key files for backward compatibility (will be removed in future)
 var PublicKeyFile = "key/public.pem"
 var PrivateKeyFile = "key/private.pem"
+
+// GetActiveKeyFiles returns the private and public key file paths for the active key
+func GetActiveKeyFiles() (string, string) {
+	// Import here to avoid circular dependency
+	activeRole := getActiveKeyRole()
+	return getKeyFilesForRole(activeRole)
+}
+
+// getActiveKeyRole returns the active key role (internal function to avoid circular dependency)
+func getActiveKeyRole() string {
+	// Check for active key config file
+	if data, err := os.ReadFile("key/active_key.json"); err == nil {
+		var config struct {
+			Role string `json:"role"`
+		}
+		if err := json.Unmarshal(data, &config); err == nil && config.Role != "" {
+			return config.Role
+		}
+	}
+
+	// Check for legacy keys (backward compatibility - should be migrated on startup)
+	// Only return legacy if owner keys don't exist (migration might be pending)
+	if _, err := os.Stat("key/private.pem"); err == nil {
+		if _, err := os.Stat("key/owner/private.pem"); err != nil {
+			return "" // Empty string indicates legacy keys (migration pending)
+		}
+		// Owner keys exist, so prefer them
+		return "owner"
+	}
+
+	// Default to owner if no keys exist
+	return "owner"
+}
+
+// getKeyFilesForRole returns key file paths for a given role
+// Uses filepath.Join for safe path construction
+func getKeyFilesForRole(role string) (string, string) {
+	// Support legacy single key format for backward compatibility
+	if role == "" {
+		// Check if legacy keys exist
+		if _, err := os.Stat("key/private.pem"); err == nil {
+			// If owner keys exist (migration happened), prefer them
+			if _, err := os.Stat("key/owner/private.pem"); err == nil {
+				// Owner keys exist, use them instead of legacy
+				return "key/owner/private.pem", "key/owner/public.pem"
+			}
+			return "key/private.pem", "key/public.pem"
+		}
+		// Default to owner if no legacy keys
+		role = "owner"
+	}
+
+	// Validate role contains only safe characters (basic check)
+	// Full validation should be done by ValidateRole in control package
+	if strings.Contains(role, "..") || strings.Contains(role, "/") || strings.Contains(role, "\\") {
+		// Path traversal attempt detected, default to owner
+		role = "owner"
+	}
+
+	// New role-based key structure - use filepath.Join for safety
+	keyDir := filepath.Join("key", role)
+	return filepath.Join(keyDir, "private.pem"), filepath.Join(keyDir, "public.pem")
+}
+
+// GetKeyFilesForRole returns key file paths for a given role (public function)
+func GetKeyFilesForRole(role string) (string, string) {
+	return getKeyFilesForRole(role)
+}
 
 // Version is set at build time via linker flags
 var Version = "*undefined*"

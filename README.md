@@ -48,6 +48,8 @@ Pull and start TeslaBleHttpProxy with `docker compose up -d`.
 
 Note that you can optionally set environment variables to override the default behavior. See [environment variables](docs/environment_variables.md) for more information.
 
+**Key Security:** Private keys are protected by UNIX file permissions (0600 - owner read/write only). Ensure the key directory has proper permissions and is not accessible to unauthorized users.
+
 ### Build yourself
 
 Download the code and save it in a folder named 'TeslaBleHttpProxy'. From there, you can easily compile the program.

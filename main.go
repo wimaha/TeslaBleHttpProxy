@@ -21,6 +21,12 @@ func main() {
 
 	config.InitConfig()
 
+	// Migrate legacy keys to owner role structure if they exist
+	if err := control.MigrateLegacyKeys(); err != nil {
+		log.Warn("Failed to migrate legacy keys", "error", err)
+		// Continue anyway - migration failure shouldn't stop the application
+	}
+
 	control.SetupBleControl()
 
 	router := routes.SetupRoutes(static, html)

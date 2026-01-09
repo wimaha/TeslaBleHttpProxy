@@ -1,9 +1,8 @@
 {{define "content"}}
 {{range $i, $a := .Messages}}
-<div class="container">
-    <div class='{{if eq $a.Type.String "Error"}}message error{{else if eq $a.Type.String "Success"}}message success{{else if eq $a.Type.String "Info"}}message info{{end}}'>
-        <h2>{{ $a.Title }}</h2>
-        <p>{{ $a.Message }}</p>
+<div class="message-container">
+    <div class='{{if eq $a.Type.String "Error"}}message-box error-message{{else if eq $a.Type.String "Success"}}message-box success-message{{else if eq $a.Type.String "Info"}}message-box info-message{{end}}'>
+        <p><strong>{{ $a.Title }}:</strong> {{ $a.Message }}</p>
     </div>
 </div>
 {{ end }}
@@ -11,56 +10,91 @@
     <div class="header">
         <h1>TeslaBleHttpProxy</h1>
     </div>
+    <div class="add-setting">
+        <h3>Key Management</h3>
+        <p class="description-text">You can generate multiple keys with different roles. The active key is used for all vehicle operations.</p>
+    </div>
     <ul class="settings-list">
+        {{range $key := .Keys}}
         <li>
             <div class="setting">
-                <span>Private Key</span>
-                <span class="value">{{.PrivateKey}}</span>
+                <span>{{$key.DisplayName}}</span>
+                <span class="value">
+                    {{if $key.Exists}}
+                        {{if $key.IsActive}}
+                            <span class="active-badge">● Active</span>
+                            <form action="/remove_keys" method="GET" style="display: inline; margin-left: 8px;">
+                                <input type="hidden" name="role" value="{{$key.Role}}" />
+                                <button type="submit" class="remove-button small-button" onclick="return confirmRemoveKey('{{$key.DisplayName}}');">Remove</button>
+                            </form>
+                        {{else}}
+                            <form action="/activate_key" method="POST" style="display: inline;">
+                                <input type="hidden" name="role" value="{{$key.Role}}" />
+                                <button type="submit" class="save-button small-button">Activate</button>
+                            </form>
+                            <form action="/remove_keys" method="GET" style="display: inline; margin-left: 8px;">
+                                <input type="hidden" name="role" value="{{$key.Role}}" />
+                                <button type="submit" class="remove-button small-button" onclick="return confirmRemoveKey('{{$key.DisplayName}}');">Remove</button>
+                            </form>
+                        {{end}}
+                    {{else}}
+                        <span class="not-generated">Not generated</span>
+                        <form action="/gen_keys" method="GET" style="display: inline; margin-left: 12px;">
+                            <input type="hidden" name="role" value="{{$key.Role}}" />
+                            <button type="submit" class="add-button small-button">Generate</button>
+                        </form>
+                    {{end}}
+                </span>
             </div>
         </li>
-        <li>
-            <div class="setting">
-                <span>Public Key</span>
-                <span class="value">{{.PublicKey}}</span>
-            </div>
-        </li>
+        {{end}}
     </ul>
     {{ if eq .ShouldGenKeys true }}
-    <div class="add-setting">
-        <form action="/gen_keys" method="GET"><button id="add-button" class="add-button">generate Keys</button></form>
+    <div class="add-setting no-keys-message">
+        <p><strong>No keys found.</strong> Generate at least one key to get started.</p>
     </div>
-    {{ else }}
-    <div class="add-setting">
-        <span><br>Important: Only use this function, if you know what you are doing. This can't be undone!</span>
-    </div>
-    <div class="add-setting">
-        <form id="remove-keys-form" action="/remove_keys" method="GET">
-            <button id="add-button" class="save-button" type="button">remove Keys</button>
-        </form>
-    </div>
-    <script>
-        document.getElementById('add-button').addEventListener('click', function(event) {
-            const userConfirmed = confirm('Are you sure you want to remove the keys?');
-            if (userConfirmed) {
-                document.getElementById('remove-keys-form').submit();
-            }
-        });
-    </script>
     {{ end }}
+    <div class="add-setting key-roles-info">
+        <h4>Key Roles Explained:</h4>
+        <ul class="role-list">
+            <li><strong>Owner:</strong> Full access to all vehicle functions (unlock, start, charge, etc.)</li>
+            <li><strong>Charging Manager:</strong> Limited to charging-related functions only (start/stop charging, set charging amps, etc.)</li>
+        </ul>
+        <div class="migration-note" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #dee2e6; font-size: 13px; color: #666; line-height: 1.6;">
+            <strong>Note:</strong> If you had keys from a previous version, they were automatically migrated to the Owner role on startup.
+        </div>
+        <div class="security-note">
+            <strong>Security:</strong> Private keys are protected by UNIX file permissions (0600 - owner read/write only). 
+            Ensure the key directory has proper permissions and is not accessible to unauthorized users.
+        </div>
+    </div>
 </div>
 <div class="container">
     <div class="header">
         <h2>Setup Vehicle</h2>
     </div>
     <div class="add-setting">
-        <span>The vehicle has to be awake! So you have to manually wake the vehicle before you send the key to the vehicle.</span>
+        <p class="warning-text">⚠️ <strong>Important:</strong> The vehicle must be awake before sending the key. Please manually wake the vehicle using the Tesla app or by opening a door before proceeding.</p>
     </div>
     <form id="send-key-form" action="/send_key" method="POST">
         <ul class="settings-list">
             <li>
                 <div class="setting">
                     <span>VIN</span>
-                    <input class="dropdown-horizontal" type="input" name="VIN" />
+                    <input class="dropdown-horizontal" type="input" name="VIN" required />
+                </div>
+            </li>
+            <li>
+                <div class="setting">
+                    <span>Key Role</span>
+                    <select class="dropdown-horizontal" name="role">
+                        <option value="">Use Active Key</option>
+                        {{range $key := .Keys}}
+                        {{if $key.Exists}}
+                        <option value="{{$key.Role}}">{{$key.DisplayName}}</option>
+                        {{end}}
+                        {{end}}
+                    </select>
                 </div>
             </li>
         </ul>
@@ -70,4 +104,17 @@
 <div class="footer">
     <span class="version">Version {{.Version}}</span>
 </div>
+<script>
+function confirmRemoveKey(displayName) {
+    var message = '⚠️ WARNING: This action cannot be undone!\n\n';
+    message += 'You are about to remove the key for "' + displayName + '".\n\n';
+    message += 'After removal:\n';
+    message += '• The key will be permanently deleted\n';
+    message += '• You may need to set up a new key if this was your only key\n';
+    message += '• If this is the active key, the proxy will stop working until you activate another key\n\n';
+    message += 'Are you absolutely sure you want to proceed?';
+    
+    return confirm(message);
+}
+</script>
 {{end}}
