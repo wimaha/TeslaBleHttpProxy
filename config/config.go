@@ -2,9 +2,10 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/log"
 )
@@ -47,6 +48,7 @@ func getActiveKeyRole() string {
 }
 
 // getKeyFilesForRole returns key file paths for a given role
+// Uses filepath.Join for safe path construction
 func getKeyFilesForRole(role string) (string, string) {
 	// Support legacy single key format for backward compatibility
 	if role == "" {
@@ -63,8 +65,16 @@ func getKeyFilesForRole(role string) (string, string) {
 		role = "owner"
 	}
 
-	// New role-based key structure
-	return fmt.Sprintf("key/%s/private.pem", role), fmt.Sprintf("key/%s/public.pem", role)
+	// Validate role contains only safe characters (basic check)
+	// Full validation should be done by ValidateRole in control package
+	if strings.Contains(role, "..") || strings.Contains(role, "/") || strings.Contains(role, "\\") {
+		// Path traversal attempt detected, default to owner
+		role = "owner"
+	}
+
+	// New role-based key structure - use filepath.Join for safety
+	keyDir := filepath.Join("key", role)
+	return filepath.Join(keyDir, "private.pem"), filepath.Join(keyDir, "public.pem")
 }
 
 // GetKeyFilesForRole returns key file paths for a given role (public function)

@@ -37,7 +37,7 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 		// Build key info list (exclude legacy - it's automatically migrated)
 		allRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
 		keys := make([]KeyInfo, 0)
-		
+
 		for _, role := range allRoles {
 			exists := control.KeyExists(role)
 			keys = append(keys, KeyInfo{
@@ -71,24 +71,18 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 		role = control.KeyRoleOwner // Default to owner
 	}
 
-	// Validate role
-	validRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
-	isValid := false
-	for _, validRole := range validRoles {
-		if role == validRole {
-			isValid = true
-			break
-		}
-	}
-	if !isValid {
+	// Validate role to prevent path traversal
+	validatedRole, validationErr := control.ValidateRole(role)
+	if validationErr != nil {
 		models.MainMessageStack.Push(models.Message{
 			Title:   "Error",
-			Message: fmt.Sprintf("Invalid role: %s", role),
+			Message: validationErr.Error(),
 			Type:    models.Error,
 		})
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
+	role = validatedRole
 
 	err := control.CreatePrivateAndPublicKeyFileForRole(role)
 
@@ -104,7 +98,7 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 				log.Warn("Failed to set active key role", "error", err)
 			}
 		}
-		
+
 		control.SetupBleControl()
 		models.MainMessageStack.Push(models.Message{
 			Title:   "Success",
@@ -124,7 +118,7 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 	// Get role from query parameter
 	role := r.URL.Query().Get("role")
-	
+
 	// Role is required (legacy keys are automatically migrated)
 	if role == "" {
 		models.MainMessageStack.Push(models.Message{
@@ -135,26 +129,20 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
-	
-	// Validate role
-	validRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
-	isValid := false
-	for _, validRole := range validRoles {
-		if role == validRole {
-			isValid = true
-			break
-		}
-	}
-	if !isValid {
+
+	// Validate role to prevent path traversal
+	validatedRole, err := control.ValidateRole(role)
+	if err != nil {
 		models.MainMessageStack.Push(models.Message{
 			Title:   "Error",
-			Message: fmt.Sprintf("Invalid role: %s. Valid roles are: owner, charging_manager", role),
+			Message: err.Error(),
 			Type:    models.Error,
 		})
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
-	
+	role = validatedRole
+
 	// Remove role-based keys
 	err1, err2 := control.RemoveKeyFilesForRole(role)
 	if err1 != nil {
@@ -177,24 +165,24 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 			Message: fmt.Sprintf("Keys for role '%s' successfully removed.", control.GetKeyRoleDisplayName(role)),
 			Type:    models.Success,
 		})
-		
+
 		// If removed key was active, try to activate another key
 		if control.GetActiveKeyRole() == role {
-				availableKeys := control.ListAvailableKeys()
-				if len(availableKeys) > 0 {
-					// Activate first available key (skip legacy/empty role if present)
-					var newActiveRole string
-					for _, key := range availableKeys {
-						if key != "" {
-							newActiveRole = key
-							break
-						}
+			availableKeys := control.ListAvailableKeys()
+			if len(availableKeys) > 0 {
+				// Activate first available key (skip legacy/empty role if present)
+				var newActiveRole string
+				for _, key := range availableKeys {
+					if key != "" {
+						newActiveRole = key
+						break
 					}
-					// Fallback to owner if no valid role found
-					if newActiveRole == "" {
-						newActiveRole = control.KeyRoleOwner
-					}
-					if err := control.SetActiveKeyRole(newActiveRole); err == nil {
+				}
+				// Fallback to owner if no valid role found
+				if newActiveRole == "" {
+					newActiveRole = control.KeyRoleOwner
+				}
+				if err := control.SetActiveKeyRole(newActiveRole); err == nil {
 					models.MainMessageStack.Push(models.Message{
 						Title:   "Info",
 						Message: fmt.Sprintf("Active key changed to '%s'.", control.GetKeyRoleDisplayName(newActiveRole)),
@@ -240,23 +228,18 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 
 		// Validate role if provided
 		if role != "" {
-			validRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
-			isValid := false
-			for _, validRole := range validRoles {
-				if role == validRole {
-					isValid = true
-					break
-				}
-			}
-			if !isValid {
+			// Validate role to prevent path traversal
+			validatedRole, err := control.ValidateRole(role)
+			if err != nil {
 				models.MainMessageStack.Push(models.Message{
 					Title:   "Error",
-					Message: fmt.Sprintf("Invalid role: %s. Valid roles are: owner, charging_manager", role),
+					Message: err.Error(),
 					Type:    models.Error,
 				})
 				return
 			}
-			
+			role = validatedRole
+
 			// Check if keys exist for this role
 			if !control.KeyExists(role) {
 				models.MainMessageStack.Push(models.Message{
@@ -302,24 +285,18 @@ func ActivateKey(w http.ResponseWriter, r *http.Request) {
 		}
 		role := r.FormValue("role")
 
-		// Validate role (legacy empty role is no longer valid)
-		validRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
-		isValid := false
-		for _, validRole := range validRoles {
-			if role == validRole {
-				isValid = true
-				break
-			}
-		}
-		if !isValid {
+		// Validate role to prevent path traversal
+		validatedRole, err := control.ValidateRole(role)
+		if err != nil {
 			models.MainMessageStack.Push(models.Message{
 				Title:   "Error",
-				Message: fmt.Sprintf("Invalid role: %s. Valid roles are: owner, charging_manager", role),
+				Message: err.Error(),
 				Type:    models.Error,
 			})
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return
 		}
+		role = validatedRole
 
 		// Check if keys exist
 		if !control.KeyExists(role) {

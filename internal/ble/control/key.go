@@ -23,6 +23,13 @@ func CreatePrivateAndPublicKeyFile() error {
 }
 
 func CreatePrivateAndPublicKeyFileForRole(role string) error {
+	// Validate role to prevent path traversal
+	validatedRole, err := ValidateRole(role)
+	if err != nil {
+		return fmt.Errorf("invalid role: %w", err)
+	}
+	role = validatedRole
+
 	// Get file paths for the role
 	privateKeyFile, publicKeyFile := GetKeyFiles(role)
 

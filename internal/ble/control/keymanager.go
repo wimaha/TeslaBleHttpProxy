@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"unicode"
 
 	"github.com/charmbracelet/log"
 )
@@ -14,6 +16,44 @@ const (
 	KeyRoleChargingManager = "charging_manager"
 )
 
+var validRoles = []string{KeyRoleOwner, KeyRoleChargingManager}
+
+// ValidateRole validates that a role string is safe to use in file paths
+// Returns the validated role or an error if invalid
+func ValidateRole(role string) (string, error) {
+	// Empty role is not valid (legacy keys should be migrated)
+	if role == "" {
+		return "", fmt.Errorf("empty role is not valid")
+	}
+
+	// Check against whitelist of valid roles
+	isValid := false
+	for _, validRole := range validRoles {
+		if role == validRole {
+			isValid = true
+			break
+		}
+	}
+	if !isValid {
+		return "", fmt.Errorf("invalid role: %s. Valid roles are: owner, charging_manager", role)
+	}
+
+	// Additional security: ensure role contains only safe characters
+	// Allow only lowercase letters, numbers, underscores, and hyphens
+	for _, r := range role {
+		if !unicode.IsLower(r) && !unicode.IsDigit(r) && r != '_' && r != '-' {
+			return "", fmt.Errorf("invalid role: contains unsafe characters")
+		}
+	}
+
+	// Prevent path traversal attempts
+	if strings.Contains(role, "..") || strings.Contains(role, "/") || strings.Contains(role, "\\") {
+		return "", fmt.Errorf("invalid role: contains path traversal characters")
+	}
+
+	return role, nil
+}
+
 const activeKeyConfigFile = "key/active_key.json"
 
 type ActiveKeyConfig struct {
@@ -21,6 +61,7 @@ type ActiveKeyConfig struct {
 }
 
 // GetKeyFiles returns the private and public key file paths for a given role
+// Validates the role to prevent path traversal attacks
 func GetKeyFiles(role string) (privateKeyFile, publicKeyFile string) {
 	// Support legacy single key format for backward compatibility
 	if role == "" {
@@ -37,8 +78,36 @@ func GetKeyFiles(role string) (privateKeyFile, publicKeyFile string) {
 		role = KeyRoleOwner
 	}
 
-	// New role-based key structure
-	return fmt.Sprintf("key/%s/private.pem", role), fmt.Sprintf("key/%s/public.pem", role)
+	// Validate role to prevent path traversal
+	validatedRole, err := ValidateRole(role)
+	if err != nil {
+		// If validation fails, default to owner and log warning
+		log.Warn("Invalid role provided, defaulting to owner", "role", role, "error", err)
+		validatedRole = KeyRoleOwner
+	}
+
+	// Build paths using filepath.Join for safety
+	// Ensure paths stay within the key directory
+	keyDir := filepath.Join("key", validatedRole)
+	privateKeyFile = filepath.Join(keyDir, "private.pem")
+	publicKeyFile = filepath.Join(keyDir, "public.pem")
+
+	// Additional safety check: ensure the resolved path is within the key directory
+	absKeyDir, err := filepath.Abs("key")
+	if err == nil {
+		absPrivateKey, err := filepath.Abs(privateKeyFile)
+		if err == nil {
+			relPath, err := filepath.Rel(absKeyDir, absPrivateKey)
+			if err != nil || strings.HasPrefix(relPath, "..") {
+				log.Error("Path traversal detected, using default owner role", "role", role, "path", privateKeyFile)
+				keyDir = filepath.Join("key", KeyRoleOwner)
+				privateKeyFile = filepath.Join(keyDir, "private.pem")
+				publicKeyFile = filepath.Join(keyDir, "public.pem")
+			}
+		}
+	}
+
+	return privateKeyFile, publicKeyFile
 }
 
 // GetActiveKeyRole returns the currently active key role
@@ -71,22 +140,12 @@ func GetActiveKeyRole() string {
 
 // SetActiveKeyRole sets the active key role
 func SetActiveKeyRole(role string) error {
-	// Validate role (legacy empty role is no longer valid - should be migrated)
-	if role == "" {
-		return fmt.Errorf("invalid role: empty role. Legacy keys should be migrated to owner role")
+	// Validate role to prevent path traversal
+	validatedRole, err := ValidateRole(role)
+	if err != nil {
+		return err
 	}
-
-	validRoles := []string{KeyRoleOwner, KeyRoleChargingManager}
-	isValid := false
-	for _, validRole := range validRoles {
-		if role == validRole {
-			isValid = true
-			break
-		}
-	}
-	if !isValid {
-		return fmt.Errorf("invalid role: %s. Valid roles are: owner, charging_manager", role)
-	}
+	role = validatedRole
 
 	// Check if keys exist for this role
 	privateKeyFile, _ := GetKeyFiles(role)
@@ -156,6 +215,13 @@ func GetKeyRoleDisplayName(role string) string {
 
 // KeyExists checks if keys exist for a given role
 func KeyExists(role string) bool {
+	// Validate role first to prevent path traversal
+	if _, err := ValidateRole(role); err != nil {
+		// Empty role is handled by GetKeyFiles, but validate non-empty roles
+		if role != "" {
+			return false
+		}
+	}
 	privateKeyFile, _ := GetKeyFiles(role)
 	_, err := os.Stat(privateKeyFile)
 	return err == nil
@@ -163,6 +229,10 @@ func KeyExists(role string) bool {
 
 // RemoveKeyFiles removes keys for a specific role
 func RemoveKeyFilesForRole(role string) (error, error) {
+	// Validate role to prevent path traversal
+	if _, err := ValidateRole(role); err != nil {
+		return fmt.Errorf("invalid role: %w", err), nil
+	}
 	privateKeyFile, publicKeyFile := GetKeyFiles(role)
 
 	var err1, err2 error

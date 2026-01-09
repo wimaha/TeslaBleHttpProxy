@@ -152,6 +152,24 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			}
 		}
 
+		// Validate role to prevent path traversal
+		// Check against valid roles
+		validRoles := []string{"owner", "charging_manager"}
+		isValid := false
+		for _, validRole := range validRoles {
+			if roleStr == validRole {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			return false, fmt.Errorf("invalid role: %s. Valid roles are: owner, charging_manager", roleStr)
+		}
+		// Prevent path traversal attempts
+		if strings.Contains(roleStr, "..") || strings.Contains(roleStr, "/") || strings.Contains(roleStr, "\\") {
+			return false, fmt.Errorf("invalid role: contains path traversal characters")
+		}
+
 		// Get public key file for the specified role
 		_, publicKeyFile := config.GetKeyFilesForRole(roleStr)
 		publicKey, err := protocol.LoadPublicKey(publicKeyFile)
