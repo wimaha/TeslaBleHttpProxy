@@ -9,6 +9,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
+	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/keys"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
@@ -130,7 +131,9 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			return true, fmt.Errorf("failed to set charge limit to %d %%: %s", chargeLimit, err)
 		}
 	case "session_info":
-		publicKey, err := protocol.LoadPublicKey(config.PublicKeyFile)
+		// Get active key files
+		_, publicKeyFile := config.GetActiveKeyFiles()
+		publicKey, err := protocol.LoadPublicKey(publicKeyFile)
 		if err != nil {
 			return false, fmt.Errorf("failed to load public key: %s", err)
 		}
@@ -141,15 +144,50 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		}
 		fmt.Printf("%s\n", info)
 	case "add-key-request":
-		publicKey, err := protocol.LoadPublicKey(config.PublicKeyFile)
+		// Get role from command body, default to owner
+		roleStr := "owner"
+		if command.Body != nil {
+			if role, ok := command.Body["role"].(string); ok && role != "" {
+				roleStr = role
+			}
+		}
+
+		// Get public key file for the specified role
+		_, publicKeyFile := config.GetKeyFilesForRole(roleStr)
+		publicKey, err := protocol.LoadPublicKey(publicKeyFile)
 		if err != nil {
 			return false, fmt.Errorf("failed to load public key: %s", err)
 		}
 
-		if err := car.SendAddKeyRequest(ctx, publicKey, true, vcsec.KeyFormFactor_KEY_FORM_FACTOR_CLOUD_KEY); err != nil {
+		// Map role string to keys.Role enum
+		var keyRole keys.Role
+		switch roleStr {
+		case "owner":
+			keyRole = keys.Role_ROLE_OWNER
+		case "charging_manager":
+			keyRole = keys.Role_ROLE_CHARGING_MANAGER
+		default:
+			// Default to owner for backward compatibility
+			keyRole = keys.Role_ROLE_OWNER
+		}
+
+		// Get display name for logging
+		displayName := roleStr
+		if roleStr == "" {
+			displayName = "Legacy (Owner)"
+		} else {
+			switch roleStr {
+			case "owner":
+				displayName = "Owner"
+			case "charging_manager":
+				displayName = "Charging Manager"
+			}
+		}
+
+		if err := car.SendAddKeyRequestWithRole(ctx, publicKey, keyRole, vcsec.KeyFormFactor_KEY_FORM_FACTOR_CLOUD_KEY); err != nil {
 			return true, fmt.Errorf("failed to add key: %s", err)
 		} else {
-			log.Info(fmt.Sprintf("Sent add-key request to %s. Confirm by tapping NFC card on center console.", car.VIN()))
+			log.Info(fmt.Sprintf("Sent add-key request to %s with role %s. Confirm by tapping NFC card on center console.", car.VIN(), displayName))
 		}
 	case "vehicle_data":
 		if command.Body == nil {

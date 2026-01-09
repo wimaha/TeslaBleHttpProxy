@@ -20,6 +20,7 @@ func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	router.HandleFunc("/dashboard", handlers.ShowDashboard(html)).Methods("GET")
 	router.HandleFunc("/gen_keys", handlers.GenKeys).Methods("GET")
 	router.HandleFunc("/remove_keys", handlers.RemoveKeys).Methods("GET")
+	router.HandleFunc("/activate_key", handlers.ActivateKey).Methods("POST")
 	router.HandleFunc("/send_key", handlers.SendKey).Methods("POST")
 	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
 
