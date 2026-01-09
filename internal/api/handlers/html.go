@@ -90,10 +90,6 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 		// Set as active key if no active key exists
 		activeRole := control.GetActiveKeyRole()
 		if activeRole == "" || !control.KeyExists(activeRole) {
-			// Default to owner if active role is empty (shouldn't happen after migration, but just in case)
-			if activeRole == "" {
-				activeRole = control.KeyRoleOwner
-			}
 			if err := control.SetActiveKeyRole(role); err != nil {
 				log.Warn("Failed to set active key role", "error", err)
 			}
