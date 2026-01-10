@@ -1,0 +1,267 @@
+{{define "content"}}
+<div class="container log-viewer-container">
+    <div class="header">
+        <h1>Log Viewer</h1>
+        <div style="margin-top: 10px;">
+            <a href="/dashboard" style="color: #007bff; text-decoration: none;">← Back to Dashboard</a>
+        </div>
+    </div>
+    
+    <div class="add-setting">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <label for="levelFilter" style="font-weight: bold;">Minimum Level:</label>
+            <select id="levelFilter" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;" title="Shows selected level and all more severe levels. Debug shows all, Info shows Info+, Warn shows Warn+, etc.">
+                <option value="">All Levels</option>
+                <option value="debug">Debug (all levels)</option>
+                <option value="info">Info (Info, Warn, Error, Fatal)</option>
+                <option value="warn">Warning (Warn, Error, Fatal)</option>
+                <option value="error">Error (Error, Fatal)</option>
+                <option value="fatal">Fatal (Fatal only)</option>
+            </select>
+            
+            <label for="limitFilter" style="font-weight: bold; margin-left: 15px;">Limit:</label>
+            <select id="limitFilter" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="100">100</option>
+                <option value="500" selected>500</option>
+                <option value="1000">1000</option>
+                <option value="5000">5000</option>
+            </select>
+            
+            <button id="refreshBtn" class="save-button small-button" style="margin-left: 15px;">Refresh</button>
+            <button id="clearBtn" class="remove-button small-button">Clear Display</button>
+            
+            <label for="intervalSelect" style="font-weight: bold; margin-left: 15px;">Refresh Interval:</label>
+            <select id="intervalSelect" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                <option value="0" selected>Off</option>
+                <option value="1">1 second</option>
+                <option value="5">5 seconds</option>
+                <option value="10">10 seconds</option>
+            </select>
+            
+            <label for="liveModeCheckbox" style="margin-left: 15px; font-weight: bold; cursor: pointer;">
+                <input type="checkbox" id="liveModeCheckbox" style="margin-right: 5px; cursor: pointer;" />
+                Live Mode (1s)
+            </label>
+        </div>
+        
+        <div id="stats" class="log-stats" style="margin-top: 15px; padding: 10px; border-radius: 4px; font-size: 13px;">
+            <strong>Statistics:</strong> Loading...
+        </div>
+    </div>
+    
+    <div id="logContainer" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 70vh; overflow-y: auto; margin-top: 15px;">
+        <div style="color: #888;">Loading logs...</div>
+    </div>
+</div>
+
+<script>
+let autoRefreshInterval = null;
+let currentInterval = 5000; // Default: 5 seconds
+let isLiveMode = false;
+
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+}
+
+function getLevelColor(level) {
+    const colors = {
+        'debug': '#888888',
+        'info': '#4CAF50',
+        'warn': '#FF9800',
+        'error': '#F44336',
+        'fatal': '#E91E63'
+    };
+    return colors[level.toLowerCase()] || '#d4d4d4';
+}
+
+function formatFields(fields) {
+    if (!fields || Object.keys(fields).length === 0) {
+        return '';
+    }
+    return ' ' + Object.entries(fields).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(' ');
+}
+
+function renderLogs(entries) {
+    const container = document.getElementById('logContainer');
+    // Handle null, undefined, or non-array responses
+    if (!entries || !Array.isArray(entries)) {
+        container.innerHTML = '<div style="color: #888;">No logs found.</div>';
+        return;
+    }
+    if (entries.length === 0) {
+        container.innerHTML = '<div style="color: #888;">No logs found.</div>';
+        return;
+    }
+    
+    const html = entries.map(entry => {
+        const levelColor = getLevelColor(entry.level);
+        const timestamp = formatTimestamp(entry.timestamp);
+        const fields = formatFields(entry.fields);
+        return `<div style="margin-bottom: 4px; padding: 2px 0; display: flex; align-items: flex-start;">
+            <div style="flex-shrink: 0; padding-right: 8px;">
+                <span style="color: #888;">[${timestamp}]</span>
+                <span style="color: ${levelColor}; font-weight: bold; margin-left: 8px; display: inline-block; width: 70px; font-family: monospace; text-align: left;">[${entry.level.toUpperCase()}]</span>
+            </div>
+            <div style="flex: 1; min-width: 0; word-wrap: break-word; overflow-wrap: break-word;">${escapeHtml(entry.message)}<span style="color: #888;">${escapeHtml(fields)}</span></div>
+        </div>`;
+    }).join('');
+    
+    container.innerHTML = html;
+    // Auto-scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function loadLogs() {
+    const level = document.getElementById('levelFilter').value;
+    const limit = document.getElementById('limitFilter').value;
+    
+    const params = new URLSearchParams();
+    if (level) params.append('level', level);
+    if (limit) params.append('limit', limit);
+    
+    try {
+        const response = await fetch(`/api/logs?${params.toString()}`);
+        if (!response.ok) {
+            throw new Error('Failed to load logs');
+        }
+        const entries = await response.json();
+        // Ensure entries is always an array
+        const entriesArray = Array.isArray(entries) ? entries : [];
+        renderLogs(entriesArray);
+    } catch (error) {
+        document.getElementById('logContainer').innerHTML = 
+            `<div style="color: #F44336;">Error loading logs: ${error.message}</div>`;
+    }
+}
+
+async function loadStats() {
+    try {
+        const response = await fetch('/api/logs/stats');
+        if (!response.ok) {
+            throw new Error('Failed to load stats');
+        }
+        const stats = await response.json();
+        
+        const statsHtml = `
+            <strong>Total Entries:</strong> ${stats.total_entries} / ${stats.max_entries} | 
+            <strong>Retention:</strong> ${stats.retention_hours} hours | 
+            <strong>Levels:</strong> ${Object.entries(stats.level_counts || {}).map(([k, v]) => `${k}: ${v}`).join(', ')} |
+            ${stats.oldest_entry ? `<strong>Oldest:</strong> ${formatTimestamp(stats.oldest_entry)} |` : ''}
+            ${stats.newest_entry ? `<strong>Newest:</strong> ${formatTimestamp(stats.newest_entry)}` : ''}
+        `;
+        document.getElementById('stats').innerHTML = statsHtml;
+    } catch (error) {
+        document.getElementById('stats').innerHTML = 
+            `<span style="color: #F44336;">Error loading stats: ${error.message}</span>`;
+    }
+}
+
+function startAutoRefresh() {
+    // Clear any existing interval
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+    
+    // Get interval from selector or live mode
+    let intervalMs;
+    if (isLiveMode) {
+        intervalMs = 1000; // Live mode: 1 second
+    } else {
+        const intervalValue = parseInt(document.getElementById('intervalSelect').value);
+        if (intervalValue === 0) {
+            // Auto-refresh is off
+            return;
+        }
+        intervalMs = intervalValue * 1000;
+    }
+    
+    currentInterval = intervalMs;
+    
+    // Start the interval
+    autoRefreshInterval = setInterval(() => {
+        loadLogs();
+        loadStats();
+    }, intervalMs);
+    
+    updateIntervalDisplay();
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+    updateIntervalDisplay();
+}
+
+function updateIntervalDisplay() {
+    const intervalSelect = document.getElementById('intervalSelect');
+    const liveModeCheckbox = document.getElementById('liveModeCheckbox');
+    
+    if (isLiveMode) {
+        intervalSelect.disabled = true;
+        intervalSelect.style.opacity = '0.6';
+        intervalSelect.style.cursor = 'not-allowed';
+    } else {
+        intervalSelect.disabled = false;
+        intervalSelect.style.opacity = '1';
+        intervalSelect.style.cursor = 'pointer';
+    }
+}
+
+function toggleLiveMode() {
+    isLiveMode = document.getElementById('liveModeCheckbox').checked;
+    
+    if (isLiveMode) {
+        // Live mode: always use 1s interval and enable auto-refresh
+        startAutoRefresh();
+    } else {
+        // Live mode off: use selected interval
+        const intervalValue = parseInt(document.getElementById('intervalSelect').value);
+        if (intervalValue === 0) {
+            stopAutoRefresh();
+        } else {
+            startAutoRefresh();
+        }
+    }
+}
+
+// Event listeners
+document.getElementById('refreshBtn').addEventListener('click', () => {
+    loadLogs();
+    loadStats();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('logContainer').innerHTML = '<div style="color: #888;">Logs cleared.</div>';
+});
+
+document.getElementById('liveModeCheckbox').addEventListener('change', toggleLiveMode);
+document.getElementById('intervalSelect').addEventListener('change', function() {
+    if (!isLiveMode) {
+        const intervalValue = parseInt(this.value);
+        if (intervalValue === 0) {
+            stopAutoRefresh();
+        } else {
+            startAutoRefresh();
+        }
+    }
+});
+
+document.getElementById('levelFilter').addEventListener('change', loadLogs);
+document.getElementById('limitFilter').addEventListener('change', loadLogs);
+
+// Initial load (auto-refresh is off by default)
+loadLogs();
+loadStats();
+updateIntervalDisplay();
+</script>
+{{end}}

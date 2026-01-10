@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"text/template"
 
-	"github.com/charmbracelet/log"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
 type KeyInfo struct {
@@ -59,7 +59,7 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 			Version:       config.Version,
 		}
 		if err := Dashboard(w, p, "", html); err != nil {
-			log.Error("Error showing dashboard", "Error", err)
+			logging.Error("Error showing dashboard", "Error", err)
 		}
 	}
 }
@@ -91,7 +91,7 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 		activeRole := control.GetActiveKeyRole()
 		if activeRole == "" || !control.KeyExists(activeRole) {
 			if err := control.SetActiveKeyRole(role); err != nil {
-				log.Warn("Failed to set active key role", "error", err)
+				logging.Warn("Failed to set active key role", "error", err)
 			}
 		}
 

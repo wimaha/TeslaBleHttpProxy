@@ -7,13 +7,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/log"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/keys"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/vcsec"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
 var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
@@ -78,11 +78,11 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.ChargeStart(ctx); err != nil {
 			if strings.Contains(err.Error(), "is_charging") {
 				//The car is already charging, so the command is somehow successfully executed.
-				log.Info("The car is already charging")
+				logging.Info("The car is already charging")
 				return false, nil
 			} else if strings.Contains(err.Error(), "complete") {
 				//The charging is completed, so the command is somehow successfully executed.
-				log.Info("The charging is completed")
+				logging.Info("The charging is completed")
 				return false, nil
 			}
 			return true, fmt.Errorf("failed to start charge: %s", err)
@@ -91,7 +91,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.ChargeStop(ctx); err != nil {
 			if strings.Contains(err.Error(), "not_charging") {
 				//The car has already stopped charging, so the command is somehow successfully executed.
-				log.Info("The car has already stopped charging")
+				logging.Info("The car has already stopped charging")
 				return false, nil
 			}
 			return true, fmt.Errorf("failed to stop charge: %s", err)
@@ -205,7 +205,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		if err := car.SendAddKeyRequestWithRole(ctx, publicKey, keyRole, vcsec.KeyFormFactor_KEY_FORM_FACTOR_CLOUD_KEY); err != nil {
 			return true, fmt.Errorf("failed to add key: %s", err)
 		} else {
-			log.Info(fmt.Sprintf("Sent add-key request to %s with role %s. Confirm by tapping NFC card on center console.", car.VIN(), displayName))
+			logging.Info(fmt.Sprintf("Sent add-key request to %s with role %s. Confirm by tapping NFC card on center console.", car.VIN(), displayName))
 		}
 	case "vehicle_data":
 		if command.Body == nil {
@@ -232,7 +232,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			if err != nil {
 				return true, fmt.Errorf("failed to marshal vehicle data: %s", err)
 			}
-			log.Debugf("data: %s", d)*/
+			logging.Debugf("data: %s", d)*/
 
 			var converted interface{}
 			switch endpoint {

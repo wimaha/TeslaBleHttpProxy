@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
 	"github.com/teslamotors/vehicle-command/pkg/protocol/protobuf/universalmessage"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
@@ -23,10 +23,10 @@ var BleControlInstance *BleControl = nil
 func SetupBleControl() {
 	var err error
 	if BleControlInstance, err = NewBleControl(); err != nil {
-		log.Warn("BleControl could not be initialized!")
+		logging.Warn("BleControl could not be initialized!")
 	} else {
 		go BleControlInstance.Loop()
-		log.Info("BleControl initialized")
+		logging.Info("BleControl initialized")
 	}
 }
 
@@ -54,10 +54,10 @@ func NewBleControl() (*BleControl, error) {
 
 	// Load private key (protected by UNIX file permissions)
 	if privateKey, err = LoadPrivateKey(privateKeyFile); err != nil {
-		log.Error("Failed to load private key.", "err", err)
+		logging.Error("Failed to load private key.", "err", err)
 		return nil, fmt.Errorf("Failed to load private key: %s", err)
 	}
-	log.Debug("PrivateKeyFile loaded", "PrivateKeyFile", privateKeyFile, "Role", GetActiveKeyRole())
+	logging.Debug("PrivateKeyFile loaded", "PrivateKeyFile", privateKeyFile, "Role", GetActiveKeyRole())
 
 	return &BleControl{
 		privateKey:    privateKey,
@@ -72,10 +72,10 @@ func (bc *BleControl) Loop() {
 	for {
 		time.Sleep(1 * time.Second)
 		if retryCommand != nil {
-			log.Info("Retrying command", "Command", retryCommand.Command, "Body", retryCommand.Body)
+			logging.Info("Retrying command", "Command", retryCommand.Command, "Body", retryCommand.Body)
 			retryCommand = bc.connectToVehicleAndOperateConnection(retryCommand)
 		} else {
-			log.Debug("Waiting for next command ...")
+			logging.Debug("Waiting for next command ...")
 			// Wait for the next command
 			select {
 			case command, ok := <-bc.providerStack:
@@ -124,7 +124,7 @@ func (bc *BleControl) markVehicleAwake(vin string) {
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
-	log.Info("Connecting to Vehicle ...")
+	logging.Info("Connecting to Vehicle ...")
 	//defer log.Debug("connecting to Vehicle done")
 
 	var sleep = 3 * time.Second
@@ -132,7 +132,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 	var lastErr error
 
 	commandError := func(err error) *commands.Command {
-		log.Error("Cannot connect to vehicle", "Error", err)
+		logging.Error("Cannot connect to vehicle", "Error", err)
 		if firstCommand.Response != nil {
 			firstCommand.Response.Error = err.Error()
 			firstCommand.Response.Result = false
@@ -151,15 +151,15 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 		}
 	} else {
 		if firstCommand.Response != nil {
-			log.Warn("No context provided, using default", "Command", firstCommand.Command, "Body", firstCommand.Body)
+			logging.Warn("No context provided, using default", "Command", firstCommand.Command, "Body", firstCommand.Body)
 		}
 		parentCtx = context.Background()
 	}
 
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
-			log.Warn(lastErr)
-			log.Debug(fmt.Sprintf("Retrying in %d seconds", sleep/time.Second))
+			logging.Warn("Retry error", "error", lastErr)
+			logging.Debug(fmt.Sprintf("Retrying in %d seconds", sleep/time.Second))
 			select {
 			case <-time.After(sleep):
 			case <-parentCtx.Done():
@@ -167,7 +167,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			}
 			sleep *= 2
 		}
-		log.Debugf("Connecting to vehicle (Attempt %d) ...", i+1)
+		logging.Debugf("Connecting to vehicle (Attempt %d) ...", i+1)
 		ctx, cancel := context.WithTimeout(parentCtx, 15*time.Second)
 		conn, car, retry, err := bc.TryConnectToVehicle(ctx, firstCommand)
 		if err == nil {
@@ -189,7 +189,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			lastErr = err
 		}
 	}
-	log.Error(fmt.Sprintf("Stop retrying after %d attempts", retryCount), "Error", lastErr)
+	logging.Error(fmt.Sprintf("Stop retrying after %d attempts", retryCount), "Error", lastErr)
 	return commandError(lastErr)
 }
 
@@ -213,7 +213,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	}()
 
 	var err error
-	log.Debug("Scanning for vehicle ...")
+	logging.Debug("Scanning for vehicle ...")
 	// Vehicle sends a beacon every ~200ms, so if it is not found in scanTimeout seconds, it is likely not in range and not worth retrying.
 	// The scan context is created independently to ensure it gets the full scanTimeout duration,
 	// regardless of how much time remains on the parent context.
@@ -256,7 +256,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		}
 	}
 
-	log.Debug("Beacon found", "LocalName", scanResult.LocalName, "Address", scanResult.Address, "RSSI", scanResult.RSSI)
+	logging.Debug("Beacon found", "LocalName", scanResult.LocalName, "Address", scanResult.Address, "RSSI", scanResult.RSSI)
 	//log.Debug("Connecting to vehicle ...")
 	conn, err = ble.NewConnectionFromScanResult(ctx, firstCommand.Vin, scanResult)
 	if err != nil {
@@ -275,13 +275,13 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 	}*/
 	//defer conn.Close()
 
-	log.Debug("Creating vehicle object ...")
+	logging.Debug("Creating vehicle object ...")
 	car, err = vehicle.NewVehicle(conn, bc.privateKey, nil)
 	if err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (B): %s", err)
 	}
 
-	log.Debug("Connecting ...")
+	logging.Debug("Connecting ...")
 	if err := car.Connect(ctx); err != nil {
 		return nil, nil, true, fmt.Errorf("failed to connect to vehicle (C): %s", err)
 	}
@@ -289,7 +289,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 	//Start Session only if privateKey is available
 	if bc.privateKey != nil {
-		log.Debug("Starting VCSEC session ...")
+		logging.Debug("Starting VCSEC session ...")
 		// First connect just VCSEC
 		if err := car.StartSession(ctx, []universalmessage.Domain{
 			protocol.DomainVCSEC,
@@ -303,8 +303,8 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 		if firstCommand.Domain != commands.Domain.VCSEC || isWakeUpCommand {
 			// For wake_up, skip sleep check and Infotainment setup (it only needs VCSEC)
 			if isWakeUpCommand {
-				log.Debug("Wake_up command detected, VCSEC session is sufficient")
-				log.Info("Connection to vehicle established (VCSEC only for wake_up)")
+				logging.Debug("Wake_up command detected, VCSEC session is sufficient")
+				logging.Info("Connection to vehicle established (VCSEC only for wake_up)")
 			} else {
 				// For vehicle_data, use conditional wakeup (check cache, only wake if needed)
 				// For all other commands, always wake up if needed
@@ -315,17 +315,17 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 					needToCheck := bc.shouldCheckSleepStatus(firstCommand.Vin)
 
 					if needToCheck {
-						log.Debug("Checking vehicle sleep status for vehicle_data (cache expired or not available) ...")
+						logging.Debug("Checking vehicle sleep status for vehicle_data (cache expired or not available) ...")
 						vs, err := car.BodyControllerState(ctx)
 						if err != nil {
-							log.Debug("Failed to get body controller state", "Error", err)
+							logging.Debug("Failed to get body controller state", "Error", err)
 							// If we can't check status and AutoWakeup is requested, try to wake up anyway
 							if firstCommand.AutoWakeup {
-								log.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
+								logging.Debug("Attempting wakeup since status check failed and AutoWakeup is enabled")
 								if err := car.Wakeup(ctx); err != nil {
 									return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 								}
-								log.Debug("Car wakeup command sent")
+								logging.Debug("Car wakeup command sent")
 								// Mark as awake after successful wakeup
 								bc.markVehicleAwake(firstCommand.Vin)
 							} else {
@@ -334,29 +334,29 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 						} else {
 							sleepStatus := vs.GetVehicleSleepStatus().String()
 							if strings.Contains(sleepStatus, "ASLEEP") {
-								log.Debug("Vehicle is asleep")
+								logging.Debug("Vehicle is asleep")
 								if firstCommand.AutoWakeup {
-									log.Debug("Waking up vehicle as requested ...")
+									logging.Debug("Waking up vehicle as requested ...")
 									if err := car.Wakeup(ctx); err != nil {
 										return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 									}
-									log.Debug("Car successfully wakeup")
+									logging.Debug("Car successfully wakeup")
 									// Mark as awake after successful wakeup
 									bc.markVehicleAwake(firstCommand.Vin)
 								} else {
 									return nil, nil, false, fmt.Errorf("vehicle is sleeping")
 								}
 							} else if strings.Contains(sleepStatus, "AWAKE") {
-								log.Debug("Vehicle is already awake")
+								logging.Debug("Vehicle is already awake")
 								// Update cache - vehicle is confirmed awake
 								bc.markVehicleAwake(firstCommand.Vin)
 							} else {
-								log.Debug("Vehicle sleep status unknown")
+								logging.Debug("Vehicle sleep status unknown")
 								// If status is unknown and AutoWakeup is requested, attempt wakeup to be safe
 								if firstCommand.AutoWakeup {
-									log.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
+									logging.Debug("Attempting wakeup since status is unknown and AutoWakeup is enabled")
 									if err := car.Wakeup(ctx); err != nil {
-										log.Debug("Wakeup failed but continuing", "Error", err)
+										logging.Debug("Wakeup failed but continuing", "Error", err)
 									} else {
 										// Mark as awake after successful wakeup
 										bc.markVehicleAwake(firstCommand.Vin)
@@ -367,20 +367,20 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 							}
 						}
 					} else {
-						log.Debug("Skipping sleep status check for vehicle_data (vehicle was awake less than 9 minutes ago)")
+						logging.Debug("Skipping sleep status check for vehicle_data (vehicle was awake less than 9 minutes ago)")
 					}
 				} else {
 					// For commands, always send wakeup (no need to check sleep status first)
-					log.Debug("Command detected, sending wakeup ...")
+					logging.Debug("Command detected, sending wakeup ...")
 					if err := car.Wakeup(ctx); err != nil {
 						return nil, nil, true, fmt.Errorf("failed to wake up car: %s", err)
 					}
-					log.Debug("Car successfully wakeup")
+					logging.Debug("Car successfully wakeup")
 					// Mark as awake after successful wakeup
 					bc.markVehicleAwake(firstCommand.Vin)
 				}
 
-				log.Debug("Starting Infotainment session ...")
+				logging.Debug("Starting Infotainment session ...")
 				// Then we can also connect the infotainment
 				if err := car.StartSession(ctx, []universalmessage.Domain{
 					protocol.DomainVCSEC,
@@ -388,11 +388,11 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 				}); err != nil {
 					return nil, nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
 				}
-				log.Info("Connection to vehicle established")
+				logging.Info("Connection to vehicle established")
 			}
 		}
 	} else {
-		log.Info("Key-Request connection established ...")
+		logging.Info("Key-Request connection established ...")
 	}
 
 	// everything fine
@@ -401,7 +401,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 }
 
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
-	log.Debug("Operating connection ...")
+	logging.Debug("Operating connection ...")
 	//defer log.Debug("operating connection done")
 	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
 	defer cancel()
@@ -414,23 +414,23 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	// If wake_up command executed successfully, upgrade session to include Infotainment
 	// for subsequent commands that might need it
 	if firstCommand.Command == "wake_up" {
-		log.Debug("Wake_up executed successfully, upgrading session to include Infotainment for subsequent commands")
+		logging.Debug("Wake_up executed successfully, upgrading session to include Infotainment for subsequent commands")
 		ctx, cancelUpgrade := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancelUpgrade()
 		if err := car.StartSession(ctx, []universalmessage.Domain{
 			protocol.DomainVCSEC,
 			protocol.DomainInfotainment,
 		}); err != nil {
-			log.Debug("Failed to upgrade session to Infotainment, subsequent commands may fail", "Error", err)
+			logging.Debug("Failed to upgrade session to Infotainment, subsequent commands may fail", "Error", err)
 		} else {
-			log.Debug("Session upgraded to include Infotainment")
+			logging.Debug("Session upgraded to include Infotainment")
 		}
 	}
 
 	handleCommand := func(command *commands.Command) (doReturn bool, retryCommand *commands.Command) {
 		//If new VIN, close connection
 		if command.Vin != firstCommand.Vin {
-			log.Debug("New VIN, closing connection ...")
+			logging.Debug("New VIN, closing connection ...")
 			return true, command
 		}
 
@@ -452,7 +452,7 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 	for {
 		select {
 		case <-connectionCtx.Done():
-			log.Debug("Connection timeout ...")
+			logging.Debug("Connection timeout ...")
 			return nil
 		case command, ok := <-bc.providerStack:
 			if !ok {
@@ -477,12 +477,12 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 }
 
 func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Command, connectionCtx context.Context) (retryCommand *commands.Command, retErr error, ctx context.Context) {
-	log.Info("Executing command", "Command", command.Command, "Body", command.Body)
+	logging.Info("Executing command", "Command", command.Command, "Body", command.Body)
 	if command.Response != nil && command.Response.Ctx != nil {
 		ctx = command.Response.Ctx
 	} else {
 		if command.Response != nil {
-			log.Debug("No context provided, using default", "Command", command.Command, "Body", command.Body)
+			logging.Debug("No context provided, using default", "Command", command.Command, "Body", command.Body)
 		}
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
@@ -527,8 +527,8 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
-			log.Warn(lastErr)
-			log.Info(fmt.Sprintf("Retrying in %d seconds", sleep/time.Second))
+			logging.Warn("Retry error", "error", lastErr)
+			logging.Info(fmt.Sprintf("Retrying in %d seconds", sleep/time.Second))
 
 			select {
 			case <-time.After(sleep):
@@ -543,7 +543,7 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 
 		retry, err := command.Send(ctx, car)
 		if err == nil {
-			log.Info("Successfully executed", "Command", command.Command, "Body", command.Body)
+			logging.Info("Successfully executed", "Command", command.Command, "Body", command.Body)
 			return nil, nil, ctx
 		}
 
@@ -558,6 +558,6 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		lastErr = err
 	}
 
-	log.Error("Canceled", "Command", command.Command, "Body", command.Body, "Error", lastErr)
+	logging.Error("Canceled", "Command", command.Command, "Body", command.Body, "Error", lastErr)
 	return nil, lastErr, ctx
 }

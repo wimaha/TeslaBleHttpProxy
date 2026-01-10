@@ -17,6 +17,18 @@ body {
     margin-bottom: 24px;
 }
 
+.log-viewer-container {
+    max-width: 95%;
+    min-width: 800px;
+}
+
+@media (max-width: 900px) {
+    .log-viewer-container {
+        min-width: auto;
+        max-width: 100%;
+    }
+}
+
 .message-container {
     max-width: 500px;
     margin: 0 auto;
@@ -439,6 +451,11 @@ input:checked + .slider:before {
     margin-right: 5px;
 }
 
+.log-stats {
+    background-color: #f8f9fa;
+    color: inherit;
+}
+
 /* Dark Mode Media Query */
 @media (prefers-color-scheme: dark) {
     body {
@@ -522,5 +539,11 @@ input:checked + .slider:before {
         background-color: #0d47a1;
         border-left-color: #2196F3;
         color: #90caf9;
+    }
+
+    .add-setting .log-stats,
+    .log-stats {
+        background-color: #1a1a1a !important;
+        color: #ddd !important;
     }
 }

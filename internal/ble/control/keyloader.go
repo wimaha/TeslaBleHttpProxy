@@ -1,8 +1,8 @@
 package control
 
 import (
-	"github.com/charmbracelet/log"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
 // LoadPrivateKey loads a private key from file (protected by UNIX file permissions)
@@ -12,6 +12,6 @@ func LoadPrivateKey(privateKeyFile string) (protocol.ECDHPrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debug("Private key loaded", "File", privateKeyFile)
+	logging.Debug("Private key loaded", "File", privateKeyFile)
 	return privateKey, nil
 }
