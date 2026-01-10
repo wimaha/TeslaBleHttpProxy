@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/charmbracelet/log"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
 const (
@@ -82,7 +82,7 @@ func GetKeyFiles(role string) (privateKeyFile, publicKeyFile string) {
 	validatedRole, err := ValidateRole(role)
 	if err != nil {
 		// If validation fails, default to owner and log warning
-		log.Warn("Invalid role provided, defaulting to owner", "role", role, "error", err)
+		logging.Warn("Invalid role provided, defaulting to owner", "role", role, "error", err)
 		validatedRole = KeyRoleOwner
 	}
 
@@ -99,7 +99,7 @@ func GetKeyFiles(role string) (privateKeyFile, publicKeyFile string) {
 		if err == nil {
 			relPath, err := filepath.Rel(absKeyDir, absPrivateKey)
 			if err != nil || strings.HasPrefix(relPath, "..") {
-				log.Error("Path traversal detected, using default owner role", "role", role, "path", privateKeyFile)
+				logging.Error("Path traversal detected, using default owner role", "role", role, "path", privateKeyFile)
 				keyDir = filepath.Join("key", KeyRoleOwner)
 				privateKeyFile = filepath.Join(keyDir, "private.pem")
 				publicKeyFile = filepath.Join(keyDir, "public.pem")
@@ -130,7 +130,7 @@ func GetActiveKeyRole() string {
 		}
 		// Legacy keys exist but owner doesn't - migration might have failed
 		// Return owner anyway as that's where they should be
-		log.Warn("Legacy keys detected but owner keys not found. Migration may have failed.")
+		logging.Warn("Legacy keys detected but owner keys not found. Migration may have failed.")
 		return KeyRoleOwner
 	}
 
@@ -170,7 +170,7 @@ func SetActiveKeyRole(role string) error {
 		return fmt.Errorf("failed to write active key config: %w", err)
 	}
 
-	log.Info("Active key role set", "role", role)
+	logging.Info("Active key role set", "role", role)
 	return nil
 }
 
@@ -273,11 +273,11 @@ func MigrateLegacyKeys() error {
 	ownerPrivateKey, ownerPublicKey := GetKeyFiles(KeyRoleOwner)
 	if _, err := os.Stat(ownerPrivateKey); err == nil {
 		// Owner keys already exist, don't migrate
-		log.Info("Legacy keys detected but owner keys already exist. Skipping migration.")
+		logging.Info("Legacy keys detected but owner keys already exist. Skipping migration.")
 		return nil
 	}
 
-	log.Info("Migrating legacy keys to owner role structure...")
+	logging.Info("Migrating legacy keys to owner role structure...")
 
 	// Ensure owner directory exists
 	ownerDir := filepath.Dir(ownerPrivateKey)
@@ -305,7 +305,7 @@ func MigrateLegacyKeys() error {
 
 	// Set restrictive permissions on private key
 	if err := ownerPrivFile.Chmod(0600); err != nil {
-		log.Warn("Failed to set owner private key permissions", "Error", err)
+		logging.Warn("Failed to set owner private key permissions", "Error", err)
 	}
 
 	if _, err := ownerPrivFile.Write(privateKeyData); err != nil {
@@ -329,12 +329,12 @@ func MigrateLegacyKeys() error {
 
 	// Remove legacy keys after successful migration
 	if err := os.Remove(legacyPrivateKey); err != nil {
-		log.Warn("Failed to remove legacy private key after migration", "Error", err)
+		logging.Warn("Failed to remove legacy private key after migration", "Error", err)
 	}
 	if err := os.Remove(legacyPublicKey); err != nil {
-		log.Warn("Failed to remove legacy public key after migration", "Error", err)
+		logging.Warn("Failed to remove legacy public key after migration", "Error", err)
 	}
 
-	log.Info("Legacy keys successfully migrated to owner role")
+	logging.Info("Legacy keys successfully migrated to owner role")
 	return nil
 }

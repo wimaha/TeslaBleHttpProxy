@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
@@ -37,7 +37,7 @@ func CreatePrivateAndPublicKeyFileForRole(role string) error {
 	if role != "" {
 		keyDir := filepath.Dir(privateKeyFile)
 		if err := os.MkdirAll(keyDir, 0755); err != nil {
-			log.Error("Error creating key directory", "Error", err, "Directory", keyDir)
+			logging.Error("Error creating key directory", "Error", err, "Directory", keyDir)
 			return err
 		}
 	}
@@ -50,14 +50,14 @@ func CreatePrivateAndPublicKeyFileForRole(role string) error {
 	// Generate ECDSA private key
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		log.Error("Error generating ECDSA private key", "Error", err)
+		logging.Error("Error generating ECDSA private key", "Error", err)
 		return err
 	}
 
 	// Encode the private key to PEM format
 	x509Encoded, err := x509.MarshalECPrivateKey(privateKey)
 	if err != nil {
-		log.Error("Error encoding ECDSA private key", "Error", err)
+		logging.Error("Error encoding ECDSA private key", "Error", err)
 		return err
 	}
 	pemEncoded := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: x509Encoded})
@@ -65,23 +65,23 @@ func CreatePrivateAndPublicKeyFileForRole(role string) error {
 	// Write the PEM-encoded private key to a file
 	privFile, err := os.Create(privateKeyFile)
 	if err != nil {
-		log.Error("Error creating private key file", "Error", err, "File", privateKeyFile)
+		logging.Error("Error creating private key file", "Error", err, "File", privateKeyFile)
 		return err
 	}
 	defer privFile.Close()
 
 	// Set restrictive permissions on private key (0600 = owner read/write only)
 	if err := privFile.Chmod(0600); err != nil {
-		log.Warn("Failed to set private key permissions", "Error", err)
+		logging.Warn("Failed to set private key permissions", "Error", err)
 	}
 
 	_, err = privFile.Write(pemEncoded)
 	if err != nil {
-		log.Error("Error writing to private key file", "Error", err)
+		logging.Error("Error writing to private key file", "Error", err)
 		return err
 	}
 
-	log.Info("ECDSA private key generated and saved", "Role", GetKeyRoleDisplayName(role), "File", privateKeyFile)
+	logging.Info("ECDSA private key generated and saved", "Role", GetKeyRoleDisplayName(role), "File", privateKeyFile)
 
 	// Extract the public key from the private key
 	publicKey := &privateKey.PublicKey
@@ -89,7 +89,7 @@ func CreatePrivateAndPublicKeyFileForRole(role string) error {
 	// Encode the public key to PEM format
 	x509EncodedPub, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
-		log.Error("Error encoding ECDSA public key", "Error", err)
+		logging.Error("Error encoding ECDSA public key", "Error", err)
 		return err
 	}
 	pemEncodedPublicKey := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: x509EncodedPub})
@@ -97,18 +97,18 @@ func CreatePrivateAndPublicKeyFileForRole(role string) error {
 	// Write the PEM-encoded public key to a file
 	pubFile, err := os.Create(publicKeyFile)
 	if err != nil {
-		log.Error("Error creating public key file", "Error", err, "File", publicKeyFile)
+		logging.Error("Error creating public key file", "Error", err, "File", publicKeyFile)
 		return err
 	}
 	defer pubFile.Close()
 
 	_, err = pubFile.Write(pemEncodedPublicKey)
 	if err != nil {
-		log.Error("Error writing to public key file", "Error", err)
+		logging.Error("Error writing to public key file", "Error", err)
 		return err
 	}
 
-	log.Info("ECDSA public key generated and saved", "Role", GetKeyRoleDisplayName(role), "File", publicKeyFile)
+	logging.Info("ECDSA public key generated and saved", "Role", GetKeyRoleDisplayName(role), "File", publicKeyFile)
 
 	return nil
 }
@@ -137,9 +137,9 @@ func SendKeysToVehicle(vin string, role string) error {
 	if err == nil {
 		//Successful
 		defer conn.Close()
-		defer log.Debug("close connection (A)")
+		defer logging.Debug("close connection (A)")
 		defer car.Disconnect()
-		defer log.Debug("disconnect vehicle (A)")
+		defer logging.Debug("disconnect vehicle (A)")
 
 		_, err, _ := tempBleControl.ExecuteCommand(car, cmd, context.Background())
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
 // Legacy key files for backward compatibility (will be removed in future)
@@ -98,8 +99,8 @@ var AppConfig *Config
 func LoadConfig() *Config {
 	envLogLevel := os.Getenv("logLevel")
 	if envLogLevel == "debug" {
-		log.SetLevel(log.DebugLevel)
-		log.Debug("LogLevel set to debug")
+		logging.SetLevel(log.DebugLevel)
+		logging.Debug("LogLevel set to debug")
 	}
 	if envLogLevel == "" {
 		envLogLevel = "info"
@@ -109,7 +110,7 @@ func LoadConfig() *Config {
 	if addr == "" {
 		addr = ":8080"
 	}
-	log.Info("Env:", "httpListenAddress", addr)
+	logging.Info("Env:", "httpListenAddress", addr)
 
 	cacheMaxAge := os.Getenv("cacheMaxAge")
 	if cacheMaxAge == "" {
@@ -117,10 +118,10 @@ func LoadConfig() *Config {
 	}
 	cacheMaxAgeInt, err := strconv.Atoi(cacheMaxAge)
 	if err != nil {
-		log.Error("Invalid cacheMaxAge value, using default (5)", "error", err)
+		logging.Error("Invalid cacheMaxAge value, using default (5)", "error", err)
 		cacheMaxAgeInt = 5
 	}
-	log.Info("Env:", "cacheMaxAge", cacheMaxAgeInt)
+	logging.Info("Env:", "cacheMaxAge", cacheMaxAgeInt)
 
 	scanTimeout := os.Getenv("scanTimeout")
 	if scanTimeout == "" {
@@ -128,10 +129,10 @@ func LoadConfig() *Config {
 	}
 	scanTimeoutInt, err := strconv.Atoi(scanTimeout)
 	if err != nil {
-		log.Error("Invalid scanTimeout value, using default (5)", "error", err)
+		logging.Error("Invalid scanTimeout value, using default (5)", "error", err)
 		scanTimeoutInt = 5
 	}
-	log.Info("Env:", "scanTimeout", scanTimeoutInt)
+	logging.Info("Env:", "scanTimeout", scanTimeoutInt)
 
 	vehicleDataCacheTime := os.Getenv("vehicleDataCacheTime")
 	if vehicleDataCacheTime == "" {
@@ -139,10 +140,10 @@ func LoadConfig() *Config {
 	}
 	vehicleDataCacheTimeInt, err := strconv.Atoi(vehicleDataCacheTime)
 	if err != nil {
-		log.Error("Invalid vehicleDataCacheTime value, using default (30)", "error", err)
+		logging.Error("Invalid vehicleDataCacheTime value, using default (30)", "error", err)
 		vehicleDataCacheTimeInt = 30
 	}
-	log.Info("Env:", "vehicleDataCacheTime", vehicleDataCacheTimeInt)
+	logging.Info("Env:", "vehicleDataCacheTime", vehicleDataCacheTimeInt)
 
 	return &Config{
 		LogLevel:             envLogLevel,

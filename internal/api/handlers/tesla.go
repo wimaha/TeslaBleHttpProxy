@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/log"
 	"github.com/gorilla/mux"
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
@@ -42,9 +42,9 @@ func commonDefer(w http.ResponseWriter, response *models.Response) {
 	}
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(ret); err != nil {
-		log.Fatal("failed to send response", "error", err)
+		logging.Fatal("failed to send response", "error", err)
 	}
-	log.Debug("Response", "Command", response.Command, "Status", status, "Result", response.Result, "Reason", response.Reason)
+	logging.Debug("Response", "Command", response.Command, "Status", status, "Result", response.Result, "Reason", response.Reason)
 }
 
 func checkBleControl(response *models.Response) bool {
@@ -79,13 +79,13 @@ func Command(w http.ResponseWriter, r *http.Request) {
 	//Body
 	var body map[string]interface{} = nil
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && err.Error() != "EOF" && !strings.Contains(err.Error(), "cannot unmarshal bool") {
-		log.Error("Decoding body", "Error", err)
+		logging.Error("Decoding body", "Error", err)
 	}
 
 	logRequestWithBody(r, "Command", body)
 
 	if !slices.Contains(commands.ExceptedCommands, command) {
-		log.Error("Command not supported", "Command", command)
+		logging.Error("Command not supported", "Command", command)
 		response.Reason = fmt.Sprintf("The command \"%s\" is not supported.", command)
 		response.Result = false
 		return
@@ -143,7 +143,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	for _, endpoint := range endpoints {
 		if !slices.Contains(commands.ExceptedEndpoints, endpoint) {
-			log.Error("Endpoint not supported", "Endpoint", endpoint)
+			logging.Error("Endpoint not supported", "Endpoint", endpoint)
 			response.Reason = fmt.Sprintf("The endpoint \"%s\" is not supported.", endpoint)
 			response.Result = false
 			commonDefer(w, &response)
@@ -172,15 +172,15 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 			if age < cacheTime {
 				// Cache hit for this endpoint
 				cachedData[endpoint] = cachedEntry.data
-				log.Debug("VehicleData endpoint cache hit", "VIN", vin, "Endpoint", endpoint, "Age", age)
+				logging.Debug("VehicleData endpoint cache hit", "VIN", vin, "Endpoint", endpoint, "Age", age)
 			} else {
 				// Cache expired for this endpoint
-				log.Debug("VehicleData endpoint cache expired", "VIN", vin, "Endpoint", endpoint, "Age", age)
+				logging.Debug("VehicleData endpoint cache expired", "VIN", vin, "Endpoint", endpoint, "Age", age)
 				missingEndpoints = append(missingEndpoints, endpoint)
 			}
 		} else {
 			// Cache miss for this endpoint
-			log.Debug("VehicleData endpoint cache miss", "VIN", vin, "Endpoint", endpoint)
+			logging.Debug("VehicleData endpoint cache miss", "VIN", vin, "Endpoint", endpoint)
 			missingEndpoints = append(missingEndpoints, endpoint)
 		}
 	}
@@ -188,7 +188,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	// If all endpoints are cached, construct response from cache
 	if len(missingEndpoints) == 0 {
-		log.Debug("VehicleData fully served from cache", "VIN", vin)
+		logging.Debug("VehicleData fully served from cache", "VIN", vin)
 		// Build response from cached endpoints
 		combinedResponse := make(map[string]json.RawMessage)
 		for _, endpoint := range endpoints {
@@ -244,7 +244,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 				data:      data,
 				timestamp: time.Now(),
 			}
-			log.Debug("VehicleData endpoint cached", "VIN", vin, "Endpoint", endpoint)
+			logging.Debug("VehicleData endpoint cached", "VIN", vin, "Endpoint", endpoint)
 		}
 		vehicleDataCacheMux.Unlock()
 
@@ -262,7 +262,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// BLE fetch failed - try to serve from cache if available
 		if len(cachedData) > 0 {
-			log.Debug("BLE fetch failed, serving partial data from cache", "VIN", vin, "CachedEndpoints", len(cachedData))
+			logging.Debug("BLE fetch failed, serving partial data from cache", "VIN", vin, "CachedEndpoints", len(cachedData))
 			combinedResponse := make(map[string]json.RawMessage)
 			for endpoint, data := range cachedData {
 				combinedResponse[endpoint] = data
@@ -341,11 +341,11 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 }
 
 func logRequest(r *http.Request, handler string) {
-	log.Debug("Received HTTP request", "Handler", handler, "Method", r.Method, "Endpoint", r.URL, "Client", r.RemoteAddr)
+	logging.Debug("Received HTTP request", "Handler", handler, "Method", r.Method, "Endpoint", r.URL, "Client", r.RemoteAddr)
 }
 
 func logRequestWithBody(r *http.Request, handler string, body map[string]interface{}) {
-	log.Debug("Received HTTP request", "Handler", handler, "Method", r.Method, "Endpoint", r.URL, "Client", r.RemoteAddr, "Body", body)
+	logging.Debug("Received HTTP request", "Handler", handler, "Method", r.Method, "Endpoint", r.URL, "Client", r.RemoteAddr, "Body", body)
 }
 
 func SetCacheControl(w http.ResponseWriter, maxAge int) {
