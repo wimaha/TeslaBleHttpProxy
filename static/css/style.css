@@ -26,6 +26,7 @@ body {
     .log-viewer-container {
         min-width: auto;
         max-width: 100%;
+        padding: 16px !important;
     }
 }
 
@@ -159,6 +160,45 @@ input:checked + .slider:before {
     font-size: 16px;
     line-height: 1.6;
     flex: 1;
+}
+
+/* Mobile responsive for settings */
+@media (max-width: 768px) {
+    .setting {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .setting span:first-child {
+        width: 100%;
+        margin-bottom: 4px;
+    }
+    
+    .value {
+        width: 100%;
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .value form {
+        display: block !important;
+        width: 100%;
+        margin-left: 0 !important;
+    }
+    
+    .value form button {
+        width: 100%;
+        margin-left: 0 !important;
+        margin-top: 4px;
+    }
+    
+    .value .active-badge,
+    .value .not-generated {
+        margin-bottom: 8px;
+    }
 }
 
 /* Verbräuche in Watt */
@@ -545,5 +585,85 @@ input:checked + .slider:before {
     .log-stats {
         background-color: #1a1a1a !important;
         color: #ddd !important;
+    }
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    .container {
+        max-width: 100%;
+        padding: 16px;
+        margin-top: 16px;
+        margin-bottom: 16px;
+    }
+    
+    .message-container {
+        max-width: 100%;
+        padding: 0 16px;
+    }
+    
+    h1 {
+        font-size: 24px;
+    }
+    
+    h2 {
+        font-size: 20px;
+    }
+    
+    h3 {
+        font-size: 16px;
+    }
+    
+    /* Log viewer mobile improvements */
+    .log-viewer-container .add-setting > div {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .log-viewer-container .add-setting label {
+        margin-left: 0 !important;
+        margin-top: 10px;
+        margin-bottom: 5px;
+    }
+    
+    .log-viewer-container .add-setting select,
+    .log-viewer-container .add-setting button {
+        width: 100%;
+        margin-left: 0 !important;
+        margin-top: 5px;
+    }
+    
+    .log-stats {
+        font-size: 12px;
+        word-wrap: break-word;
+    }
+    
+    /* Log entries mobile layout */
+    #logContainer {
+        font-size: 11px !important;
+        padding: 12px !important;
+    }
+    
+    .log-entry {
+        flex-direction: column !important;
+        padding: 8px 0 !important;
+        border-bottom: 1px solid #333 !important;
+    }
+    
+    .log-meta {
+        margin-bottom: 6px !important;
+        padding-right: 0 !important;
+        white-space: normal !important;
+    }
+    
+    .log-meta span:last-child {
+        width: auto !important;
+        margin-left: 8px !important;
+    }
+    
+    .log-message {
+        font-size: 13px !important;
+        line-height: 1.6 !important;
+        width: 100% !important;
     }
 }

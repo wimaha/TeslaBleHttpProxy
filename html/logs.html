@@ -49,7 +49,7 @@
         </div>
     </div>
     
-    <div id="logContainer" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 70vh; overflow-y: auto; margin-top: 15px;">
+    <div id="logContainer" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 12px; max-height: 70vh; overflow-y: auto; margin-top: 15px; word-wrap: break-word;">
         <div style="color: #888;">Loading logs...</div>
     </div>
 </div>
@@ -98,12 +98,12 @@ function renderLogs(entries) {
         const levelColor = getLevelColor(entry.level);
         const timestamp = formatTimestamp(entry.timestamp);
         const fields = formatFields(entry.fields);
-        return `<div style="margin-bottom: 4px; padding: 2px 0; display: flex; align-items: flex-start;">
-            <div style="flex-shrink: 0; padding-right: 8px;">
+        return `<div class="log-entry" style="margin-bottom: 4px; padding: 2px 0; display: flex; align-items: flex-start;">
+            <div class="log-meta" style="flex-shrink: 0; padding-right: 8px; white-space: nowrap;">
                 <span style="color: #888;">[${timestamp}]</span>
                 <span style="color: ${levelColor}; font-weight: bold; margin-left: 8px; display: inline-block; width: 70px; font-family: monospace; text-align: left;">[${entry.level.toUpperCase()}]</span>
             </div>
-            <div style="flex: 1; min-width: 0; word-wrap: break-word; overflow-wrap: break-word;">${escapeHtml(entry.message)}<span style="color: #888;">${escapeHtml(fields)}</span></div>
+            <div class="log-message" style="flex: 1; min-width: 0; word-wrap: break-word; overflow-wrap: break-word;">${escapeHtml(entry.message)}<span style="color: #888;">${escapeHtml(fields)}</span></div>
         </div>`;
     }).join('');
     
