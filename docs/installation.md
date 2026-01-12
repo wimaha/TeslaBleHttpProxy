@@ -114,19 +114,26 @@ This variant will be described later.
 
 ## Step 3: Generate key for vehicle
 
+**Security Recommendation:** We recommend using the **Charging Manager** role for security. It provides limited access suitable for charging management and works perfectly with [evcc tesla-ble template](https://docs.evcc.io/docs/devices/vehicles#tesla-ble). The Charging Manager role can:
+- Read vehicle data
+- Authorize charging-related commands: `wake`, `charge_start`, `charge_stop`, `set_charging_amps`
+
+The **Owner** role provides full access to all vehicle functions (unlock, start, etc.) and should only be used if you need non-charging functions.
+
 To generate the required keys browse to `http://YOUR_IP:8080/dashboard`. In the dashboard you will see that the keys are missing:
 
-<img src="proxy1.png" alt="Picture of the Dashboard with missing keys." width="40%" height="40%">
+<img src="proxy1.png" alt="Picture of the Dashboard with missing keys." width="40%" height="40%" style="box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); margin-bottom: 10px;">
 
-Please click on `generate Keys` and the keys will be automatically generated and saved.
+Please click on `Generate` for the **Charging Manager** role (recommended for security). The keys will be automatically generated and saved. The Charging Manager key will be set as active by default.
 
-<img src="proxy2.png" alt="Picture of the Dashboard with success message and keys." width="40%" height="40%">
+<img src="proxy2b.png" alt="Picture of the Dashboard with success message and keys." width="40%" height="40%"><br/>
+<img src="proxy2.png" alt="Picture of the Dashboard with success message and keys." width="40%" height="40%" style="box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); margin-bottom: 10px;">
 
 After that please enter your VIN under `Setup Vehicle`. Before you proceed make sure your vehicle is awake! So you have to manually wake the vehicle before you send the key to the vehicle.
 
-<img src="proxy3.png" alt="Picture of Setup Vehicle Part of the Dashboard." width="40%" height="40%">
+<img src="proxy3.png" alt="Picture of Setup Vehicle Part of the Dashboard." width="40%" height="40%" style="box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); margin-bottom: 10px;">
 
-Finally the keys is send to the vehicle. You have to confirm by tapping your NFC card on center console.
+The key is now sent to the vehicle. To complete the process, confirm by tapping your NFC card on the center console. (Note: There will be no message on the Tesla screen before confirmation with the NFC card.)
 
 <img src="proxy6.png" alt="Picture of success message sent add-key request." width="40%" height="40%">
 
