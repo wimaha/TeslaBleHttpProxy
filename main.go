@@ -32,6 +32,18 @@ func main() {
 
 	control.SetupBleControl()
 
+	// Warn if Owner role is active (Charging Manager is recommended for security)
+	activeRole := control.GetActiveKeyRole()
+	if activeRole == control.KeyRoleOwner {
+		logging.Warn(
+			"⚠️  SECURITY WARNING: Owner role is currently active. " +
+				"Owner role provides full access to all vehicle functions (unlock, start, etc.). " +
+				"For better security, consider using the Charging Manager role instead, which provides " +
+				"limited access suitable for charging management and works perfectly with evcc tesla-ble template. " +
+				"You can switch roles in the dashboard.",
+		)
+	}
+
 	router := routes.SetupRoutes(static, html)
 
 	logging.Info("TeslaBleHttpProxy is running!")

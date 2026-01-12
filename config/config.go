@@ -44,8 +44,8 @@ func getActiveKeyRole() string {
 		return "owner"
 	}
 
-	// Default to owner if no keys exist
-	return "owner"
+	// Default to charging_manager if no keys exist (recommended for security)
+	return "charging_manager"
 }
 
 // getKeyFilesForRole returns key file paths for a given role
@@ -62,15 +62,15 @@ func getKeyFilesForRole(role string) (string, string) {
 			}
 			return "key/private.pem", "key/public.pem"
 		}
-		// Default to owner if no legacy keys
-		role = "owner"
+		// Default to charging_manager if no legacy keys (recommended for security)
+		role = "charging_manager"
 	}
 
 	// Validate role contains only safe characters (basic check)
 	// Full validation should be done by ValidateRole in control package
 	if strings.Contains(role, "..") || strings.Contains(role, "/") || strings.Contains(role, "\\") {
-		// Path traversal attempt detected, default to owner
-		role = "owner"
+		// Path traversal attempt detected, default to charging_manager
+		role = "charging_manager"
 	}
 
 	// New role-based key structure - use filepath.Join for safety

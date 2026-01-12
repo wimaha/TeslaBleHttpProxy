@@ -144,8 +144,8 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		}
 		fmt.Printf("%s\n", info)
 	case "add-key-request":
-		// Get role from command body, default to owner
-		roleStr := "owner"
+		// Get role from command body, default to charging_manager (recommended for security)
+		roleStr := "charging_manager"
 		if command.Body != nil {
 			if role, ok := command.Body["role"].(string); ok && role != "" {
 				roleStr = role
@@ -185,8 +185,8 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 		case "charging_manager":
 			keyRole = keys.Role_ROLE_CHARGING_MANAGER
 		default:
-			// Default to owner for backward compatibility
-			keyRole = keys.Role_ROLE_OWNER
+			// Default to charging_manager (recommended for security)
+			keyRole = keys.Role_ROLE_CHARGING_MANAGER
 		}
 
 		// Get display name for logging

@@ -74,16 +74,16 @@ func GetKeyFiles(role string) (privateKeyFile, publicKeyFile string) {
 			}
 			return "key/private.pem", "key/public.pem"
 		}
-		// Default to owner if no legacy keys
-		role = KeyRoleOwner
+		// Default to charging_manager if no legacy keys (recommended for security)
+		role = KeyRoleChargingManager
 	}
 
 	// Validate role to prevent path traversal
 	validatedRole, err := ValidateRole(role)
 	if err != nil {
-		// If validation fails, default to owner and log warning
-		logging.Warn("Invalid role provided, defaulting to owner", "role", role, "error", err)
-		validatedRole = KeyRoleOwner
+		// If validation fails, default to charging_manager and log warning
+		logging.Warn("Invalid role provided, defaulting to charging_manager", "role", role, "error", err)
+		validatedRole = KeyRoleChargingManager
 	}
 
 	// Build paths using filepath.Join for safety
@@ -99,8 +99,8 @@ func GetKeyFiles(role string) (privateKeyFile, publicKeyFile string) {
 		if err == nil {
 			relPath, err := filepath.Rel(absKeyDir, absPrivateKey)
 			if err != nil || strings.HasPrefix(relPath, "..") {
-				logging.Error("Path traversal detected, using default owner role", "role", role, "path", privateKeyFile)
-				keyDir = filepath.Join("key", KeyRoleOwner)
+				logging.Error("Path traversal detected, using default charging_manager role", "role", role, "path", privateKeyFile)
+				keyDir = filepath.Join("key", KeyRoleChargingManager)
 				privateKeyFile = filepath.Join(keyDir, "private.pem")
 				publicKeyFile = filepath.Join(keyDir, "public.pem")
 			}
@@ -134,8 +134,8 @@ func GetActiveKeyRole() string {
 		return KeyRoleOwner
 	}
 
-	// Default to owner if no keys exist
-	return KeyRoleOwner
+	// Default to charging_manager if no keys exist (recommended for security)
+	return KeyRoleChargingManager
 }
 
 // SetActiveKeyRole sets the active key role
