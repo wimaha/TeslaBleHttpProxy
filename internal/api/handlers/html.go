@@ -35,7 +35,8 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 		activeRole := control.GetActiveKeyRole()
 
 		// Build key info list (exclude legacy - it's automatically migrated)
-		allRoles := []string{control.KeyRoleOwner, control.KeyRoleChargingManager}
+		// Charging Manager first as it's recommended for security
+		allRoles := []string{control.KeyRoleChargingManager, control.KeyRoleOwner}
 		keys := make([]KeyInfo, 0)
 
 		for _, role := range allRoles {
@@ -68,7 +69,7 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 	// Get role from query parameter
 	role := r.URL.Query().Get("role")
 	if role == "" {
-		role = control.KeyRoleOwner // Default to owner
+		role = control.KeyRoleChargingManager // Default to charging_manager (recommended for security)
 	}
 
 	// Validate role to prevent path traversal
@@ -174,9 +175,9 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 				}
-				// Fallback to owner if no valid role found
+				// Fallback to charging_manager if no valid role found (recommended for security)
 				if newActiveRole == "" {
-					newActiveRole = control.KeyRoleOwner
+					newActiveRole = control.KeyRoleChargingManager
 				}
 				if err := control.SetActiveKeyRole(newActiveRole); err == nil {
 					models.MainMessageStack.Push(models.Message{
@@ -250,7 +251,8 @@ func SendKey(w http.ResponseWriter, r *http.Request) {
 			activeRole := control.GetActiveKeyRole()
 			// Ensure active role is not legacy (should have been migrated)
 			if activeRole == "" {
-				activeRole = control.KeyRoleOwner
+				// Default to charging_manager (recommended for security)
+				activeRole = control.KeyRoleChargingManager
 			}
 			role = activeRole
 		}

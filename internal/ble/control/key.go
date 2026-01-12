@@ -18,8 +18,8 @@ import (
 )
 
 func CreatePrivateAndPublicKeyFile() error {
-	// Default to owner role for backward compatibility
-	return CreatePrivateAndPublicKeyFileForRole(KeyRoleOwner)
+	// Default to charging_manager role (recommended for security)
+	return CreatePrivateAndPublicKeyFileForRole(KeyRoleChargingManager)
 }
 
 func CreatePrivateAndPublicKeyFileForRole(role string) error {
