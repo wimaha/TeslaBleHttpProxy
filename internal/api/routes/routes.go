@@ -26,6 +26,9 @@ func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	router.HandleFunc("/activate_key", handlers.ActivateKey).Methods("POST")
 	router.HandleFunc("/send_key", handlers.SendKey).Methods("POST")
 	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	    http.Redirect(w, r, "/dashboard", http.StatusFound)
+	}).Methods("GET")
 
 	return router
 }
