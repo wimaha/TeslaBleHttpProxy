@@ -16,7 +16,7 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
-var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
+var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode", "add_charge_schedule", "remove_charge_schedule"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -264,10 +264,73 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
 		}
 		command.Response.Response = vsJson
-	default:
-		return false, fmt.Errorf("unrecognized command: %s", command.Command)
+	case "add_charge_schedule":
+	    schedule := &vehicle.ChargeSchedule{}
+	    if v, ok := command.Body["id"].(float64); ok {
+	        schedule.Id = uint64(v)
+	    }
+	    if v, ok := command.Body["start_enabled"].(bool); ok {
+	        schedule.StartEnabled = v
+	    }
+	    if v, ok := command.Body["start_time"].(float64); ok {
+	        schedule.StartTime = int32(v)
+	    }
+	    if v, ok := command.Body["end_enabled"].(bool); ok {
+	        schedule.EndEnabled = v
+	    }
+	    if v, ok := command.Body["end_time"].(float64); ok {
+	        schedule.EndTime = int32(v)
+	    }
+	    if v, ok := command.Body["one_time"].(bool); ok {
+	        schedule.OneTime = v
+	    }
+	    if v, ok := command.Body["enabled"].(bool); ok {
+	        schedule.Enabled = v
+	    }
+	    if v, ok := command.Body["lat"].(float64); ok {
+	        schedule.Latitude = float32(v)
+	    }
+	    if v, ok := command.Body["lon"].(float64); ok {
+	        schedule.Longitude = float32(v)
+	    }
+	    if v, ok := command.Body["days_of_week"].(string); ok {
+	        schedule.DaysOfWeek = parseDaysOfWeek(v)
+	    }
+	    if err := car.AddChargeSchedule(ctx, schedule); err != nil {
+	        return true, fmt.Errorf("failed to add charge schedule: %s", err)
+	    }
+	case "remove_charge_schedule":
+	    id, ok := command.Body["id"].(float64)
+	    if !ok {
+	        return false, fmt.Errorf("id missing in body")
+	    }
+	    if err := car.RemoveChargeSchedule(ctx, uint64(id)); err != nil {
+	        return true, fmt.Errorf("failed to remove charge schedule: %s", err)
 	}
+	default:
+	    return false, fmt.Errorf("unrecognized command: %s", command.Command)
+    }
 
 	// everything fine
 	return false, nil
+}
+
+func parseDaysOfWeek(days string) int32 {
+    dayMap := map[string]int32{
+        "sunday": 1, "monday": 2, "tuesday": 4, "wednesday": 8,
+        "thursday": 16, "friday": 32, "saturday": 64,
+    }
+    if strings.EqualFold(days, "all") {
+        return 127
+    }
+    if strings.EqualFold(days, "weekdays") {
+        return 62
+    }
+    var mask int32
+    for _, d := range strings.Split(days, ",") {
+        if bit, ok := dayMap[strings.ToLower(strings.TrimSpace(d))]; ok {
+            mask |= bit
+        }
+    }
+    return mask
 }
