@@ -21,6 +21,7 @@ func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	router.HandleFunc("/logs", handlers.ShowLogViewer(html)).Methods("GET")
 	router.HandleFunc("/api/logs", handlers.GetLogs).Methods("GET")
 	router.HandleFunc("/api/logs/stats", handlers.GetLogStats).Methods("GET")
+	router.HandleFunc("/api/admin/reboot", handlers.RebootSystem).Methods("POST")
 	router.HandleFunc("/gen_keys", handlers.GenKeys).Methods("GET")
 	router.HandleFunc("/remove_keys", handlers.RemoveKeys).Methods("GET")
 	router.HandleFunc("/activate_key", handlers.ActivateKey).Methods("POST")
