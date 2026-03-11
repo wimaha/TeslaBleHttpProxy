@@ -29,6 +29,7 @@
             
             <button id="refreshBtn" class="save-button small-button" style="margin-left: 15px;">Refresh</button>
             <button id="clearBtn" class="remove-button small-button">Clear Display</button>
+            <button id="rebootBtn" class="remove-button small-button" title="Reboot the Raspberry Pi">Reboot Raspberry</button>
             
             <label for="intervalSelect" style="font-weight: bold; margin-left: 15px;">Refresh Interval:</label>
             <select id="intervalSelect" style="padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
@@ -242,6 +243,46 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
 
 document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('logContainer').innerHTML = '<div style="color: #888;">Logs cleared.</div>';
+});
+
+document.getElementById('rebootBtn').addEventListener('click', async () => {
+    const firstConfirm = confirm('Are you sure you want to reboot the Raspberry Pi? The proxy will be temporarily unavailable.');
+    if (!firstConfirm) {
+        return;
+    }
+
+    const secondConfirm = confirm('Confirm reboot now?');
+    if (!secondConfirm) {
+        return;
+    }
+
+    const rebootBtn = document.getElementById('rebootBtn');
+    rebootBtn.disabled = true;
+    rebootBtn.textContent = 'Rebooting...';
+
+    try {
+        const response = await fetch('/api/admin/reboot', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        });
+
+        const payload = await response.json();
+        if (response.ok && payload.response && payload.response.result) {
+            alert('Reboot initiated. The device should restart shortly.');
+            return;
+        }
+
+        const reason = payload && payload.response ? payload.response.reason : 'Unknown error';
+        alert(`Reboot failed: ${reason}`);
+    } catch (error) {
+        alert(`Reboot failed: ${error.message}`);
+    }
+
+    rebootBtn.disabled = false;
+    rebootBtn.textContent = 'Reboot Raspberry';
 });
 
 document.getElementById('liveModeCheckbox').addEventListener('change', toggleLiveMode);

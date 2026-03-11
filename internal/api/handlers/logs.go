@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
+	"os/exec"
 	"strconv"
 	"text/template"
 	"time"
 
+	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
@@ -75,4 +79,49 @@ func LogViewer(w http.ResponseWriter, html fs.FS) error {
 	tmpl := template.Must(
 		template.New("html/layout.html").ParseFS(html, "html/layout.html", "html/logs.html"))
 	return tmpl.ExecuteTemplate(w, "layout.html", nil)
+}
+
+// RebootSystem initiates a Raspberry Pi reboot.
+// The reboot is executed asynchronously so the API can return first.
+func RebootSystem(w http.ResponseWriter, r *http.Request) {
+	var response models.Response
+	response.Command = "system_reboot"
+	response.Result = false
+
+	defer commonDefer(w, &response)
+
+	logging.Warn("System reboot requested", "remote_addr", r.RemoteAddr)
+
+	go func() {
+		// Give the HTTP response time to flush before rebooting the host.
+		time.Sleep(750 * time.Millisecond)
+		if err := executeReboot(); err != nil {
+			logging.Error("Failed to execute reboot command", "error", err)
+		}
+	}()
+
+	response.Result = true
+	response.Reason = "System reboot initiated. The device will restart shortly."
+}
+
+func executeReboot() error {
+	commands := [][]string{
+		{"sudo", "shutdown", "-r", "now"},
+		{"/sbin/shutdown", "-r", "now"},
+		{"shutdown", "-r", "now"},
+	}
+
+	var lastErr error
+	for _, args := range commands {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+		err := cmd.Run()
+		cancel()
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+	}
+
+	return fmt.Errorf("all reboot commands failed: %w", lastErr)
 }
