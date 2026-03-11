@@ -279,10 +279,10 @@ document.getElementById('rebootBtn').addEventListener('click', async () => {
         alert(`Reboot failed: ${reason}`);
     } catch (error) {
         alert(`Reboot failed: ${error.message}`);
+    } finally {
+        rebootBtn.disabled = false;
+        rebootBtn.textContent = 'Reboot Raspberry';
     }
-
-    rebootBtn.disabled = false;
-    rebootBtn.textContent = 'Reboot Raspberry';
 });
 
 document.getElementById('liveModeCheckbox').addEventListener('change', toggleLiveMode);
