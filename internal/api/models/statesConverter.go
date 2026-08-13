@@ -11,6 +11,8 @@ func flatten(s string) string {
 	return strings.ReplaceAll(s, ":{}", "")
 }
 
+func strPtr(s string) *string { return &s }
+
 func ChargeStateFromBle(VehicleData *carserver.VehicleData) ChargeState {
 	return ChargeState{
 		Timestamp:                      VehicleData.ChargeState.GetTimestamp().AsTime().Unix(),
@@ -21,11 +23,11 @@ func ChargeStateFromBle(VehicleData *carserver.VehicleData) ChargeState {
 		ChargeLimitSocMax:              VehicleData.ChargeState.GetChargeLimitSocMax(),
 		MaxRangeChargeCounter:          VehicleData.ChargeState.GetMaxRangeChargeCounter(),
 		FastChargerPresent:             VehicleData.ChargeState.GetFastChargerPresent(),
-		FastChargerType:                flatten(VehicleData.ChargeState.GetFastChargerType().String()),
+		FastChargerType:                strPtr(flatten(VehicleData.ChargeState.GetFastChargerType().String())),
 		BatteryRange:                   VehicleData.ChargeState.GetBatteryRange(),
 		EstBatteryRange:                VehicleData.ChargeState.GetEstBatteryRange(),
 		IdealBatteryRange:              VehicleData.ChargeState.GetIdealBatteryRange(),
-		BatteryLevel:                   VehicleData.ChargeState.GetBatteryLevel(),
+		BatteryLevel:                   VehicleData.ChargeState.GetUsableBatteryLevel(), //VehicleData.ChargeState.GetBatteryLevel(),
 		UsableBatteryLevel:             VehicleData.ChargeState.GetUsableBatteryLevel(),
 		ChargeEnergyAdded:              VehicleData.ChargeState.GetChargeEnergyAdded(),
 		ChargeMilesAddedRated:          VehicleData.ChargeState.GetChargeMilesAddedRated(),
@@ -59,8 +61,8 @@ func ChargeStateFromBle(VehicleData *carserver.VehicleData) ChargeState {
 		ManagedChargingStartTime:       VehicleData.ChargeState.GetManagedChargingStartTime(),
 		ChargePortcoldWeatherMode:      VehicleData.ChargeState.GetChargePortColdWeatherMode(),
 		ChargePortColor:                flatten(VehicleData.ChargeState.GetChargePortColor().String()),
-		ConnChargeCable:                flatten(VehicleData.ChargeState.GetConnChargeCable().String()),
-		FastChargerBrand:               flatten(VehicleData.ChargeState.GetFastChargerBrand().String()),
+		ConnChargeCable:                strPtr(flatten(VehicleData.ChargeState.GetConnChargeCable().String())),
+		FastChargerBrand:               strPtr(flatten(VehicleData.ChargeState.GetFastChargerBrand().String())),
 		MinutesToFullCharge:            VehicleData.ChargeState.GetMinutesToFullCharge(),
 	}
 }
