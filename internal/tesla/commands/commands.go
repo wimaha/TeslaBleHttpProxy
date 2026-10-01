@@ -16,7 +16,7 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
-var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode", "add_charge_schedule", "remove_charge_schedule"}
+var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode", "add_charge_schedule", "remove_charge_schedule", "set_temps", "actuate_trunk"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state", "drive_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -56,6 +56,28 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	case "door_unlock":
 		if err := car.Unlock(ctx); err != nil {
 			return true, fmt.Errorf("failed to unlock %s", err)
+		}
+	case "set_temps":
+		driverTemp, passengerTemp, err := parseTemps(command.Body)
+		if err != nil {
+			return false, err
+		}
+		if err := car.ChangeClimateTemp(ctx, driverTemp, passengerTemp); err != nil {
+			return true, fmt.Errorf("failed to set temps to %.1f/%.1f: %s", driverTemp, passengerTemp, err)
+		}
+	case "actuate_trunk":
+		whichTrunk, err := parseWhichTrunk(command.Body)
+		if err != nil {
+			return false, err
+		}
+		if whichTrunk == "front" {
+			if err := car.OpenFrunk(ctx); err != nil {
+				return true, fmt.Errorf("failed to open frunk: %s", err)
+			}
+		} else {
+			if err := car.ActuateTrunk(ctx); err != nil {
+				return true, fmt.Errorf("failed to actuate trunk: %s", err)
+			}
 		}
 	case "set_sentry_mode":
 		var on bool
@@ -290,4 +312,69 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 
 	// everything fine
 	return false, nil
+}
+
+// parseFloatField reads a numeric body field that may arrive as a JSON number or a string.
+func parseFloatField(body map[string]interface{}, key string) (float32, bool, error) {
+	raw, ok := body[key]
+	if !ok || raw == nil {
+		return 0, false, nil
+	}
+	switch v := raw.(type) {
+	case float64:
+		return float32(v), true, nil
+	case string:
+		f, err := strconv.ParseFloat(strings.TrimSpace(v), 32)
+		if err != nil {
+			return 0, true, fmt.Errorf("%s parsing error: %s", key, err)
+		}
+		return float32(f), true, nil
+	default:
+		return 0, true, fmt.Errorf("%s has unsupported type %T", key, raw)
+	}
+}
+
+// parseTemps reads the Fleet API set_temps body: {"driver_temp": 21, "passenger_temp": 21} in Celsius.
+// passenger_temp is optional and defaults to driver_temp.
+func parseTemps(body map[string]interface{}) (float32, float32, error) {
+	driver, found, err := parseFloatField(body, "driver_temp")
+	if err != nil {
+		return 0, 0, err
+	}
+	if !found {
+		return 0, 0, fmt.Errorf("driver_temp missing in body")
+	}
+	passenger, found, err := parseFloatField(body, "passenger_temp")
+	if err != nil {
+		return 0, 0, err
+	}
+	if !found {
+		passenger = driver
+	}
+	for _, t := range []float32{driver, passenger} {
+		if t < 15 || t > 28 {
+			return 0, 0, fmt.Errorf("temperature %.1f out of range 15-28 °C", t)
+		}
+	}
+	return driver, passenger, nil
+}
+
+// parseWhichTrunk reads the Fleet API actuate_trunk body: {"which_trunk": "rear"} or {"which_trunk": "front"}.
+func parseWhichTrunk(body map[string]interface{}) (string, error) {
+	raw, ok := body["which_trunk"]
+	if !ok || raw == nil {
+		return "", fmt.Errorf("which_trunk missing in body")
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return "", fmt.Errorf("which_trunk has unsupported type %T", raw)
+	}
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "rear":
+		return "rear", nil
+	case "front":
+		return "front", nil
+	default:
+		return "", fmt.Errorf("which_trunk must be \"rear\" or \"front\", got %q", s)
+	}
 }
