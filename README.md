@@ -187,14 +187,17 @@ Get vehicle data:
 Get vehicle data with automatic wakeup:
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?wakeup=true`
 
-Currently you will receive the following data:
+By default you will receive the following data:
 
 - charge_state
 - climate_state
 
-If you want to receive specific data, you can add the endpoints to the request. For example:
+If you want to receive specific data, you can add the endpoints to the request. This also lets you request additional endpoints that are not part of the default response, such as `drive_state` (which includes the `odometer` field in miles, delivered over BLE in the drive state). For example:
 
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=charge_state`
+
+Request the drive state including the odometer:
+`http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=drive_state`
 
 Get specific data with automatic wakeup:
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?endpoints=charge_state&wakeup=true`
