@@ -4,22 +4,28 @@ name: Claude PR Review
 # secrets, so PRs from forks are reviewed too. The PR code is never checked out
 # or executed: Claude reads the diff via `gh pr diff` and only the base branch
 # is on disk (to compare the change against the existing behaviour).
+#
+# A PR is reviewed automatically once, when it is opened (or marked ready for
+# review). Further reviews are manual: add the label "claude-review" to the PR,
+# or use "Run workflow" in the Actions tab. Only users with triage/write access
+# can add labels. The label is removed again after the run.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, ready_for_review, labeled]
   workflow_dispatch:
     inputs:
       pr_number:
         description: "PR number to review"
         required: true
 
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
-
 jobs:
   review:
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.action == 'labeled' && github.event.label.name == 'claude-review') ||
+      (github.event.action != 'labeled' && github.event.pull_request.draft == false)
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || inputs.pr_number }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -137,3 +143,9 @@ jobs:
             comments; don't submit review text as messages.
           claude_args: |
             --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
+
+      - name: Remove claude-review label
+        if: always() && github.event.action == 'labeled'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit ${{ github.event.pull_request.number }} -R ${{ github.repository }} --remove-label claude-review
