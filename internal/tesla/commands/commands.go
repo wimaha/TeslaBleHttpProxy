@@ -75,8 +75,11 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 				return true, fmt.Errorf("failed to open frunk: %s", err)
 			}
 		} else {
+			// The rear trunk is a toggle. If the car acted but the reply was lost, a retry
+			// would move it back, so never retry: report the error and let the client
+			// check closure_statuses.rear_trunk before sending again.
 			if err := car.ActuateTrunk(ctx); err != nil {
-				return true, fmt.Errorf("failed to actuate trunk: %s", err)
+				return false, fmt.Errorf("failed to actuate trunk (not retried, it is a toggle): %s", err)
 			}
 		}
 	case "set_sentry_mode":
