@@ -81,33 +81,44 @@ jobs:
 
             Secondary: real bugs and security issues. Skip pure style nitpicks.
 
-            Output:
-            - Post ONE top-level comment with `gh pr comment <number> --body ...`, in
-              English, structured as:
-              1. Verdict: "No compatibility risk found" / "Compatibility risk" /
-                 "Breaking change"
-              2. Compatibility findings (what breaks, for whom, how to fix or how to
-                 make it backward compatible, e.g. defaults, aliases)
-              3. Other bugs/security findings
-              4. What users or integrators would need to change, if anything
-              5. "Checklist for the author": a GitHub task list (`- [ ] ...`)
-                 with every concrete action the author still has to take
-                 before this PR can be merged (fixes, tests, docs, things to
-                 verify), most important first, one action per item, each
-                 referencing the file:line or finding it comes from. If
-                 nothing is left to do, write "- [x] Nothing left to do for
-                 the author".
-              6. "Merge recommendation for @${{ github.repository_owner }}": exactly one of
-                 - "✅ Ready to merge" (checklist empty, no compatibility risk)
-                 - "🟡 Merge after the checklist is done" (only minor items left)
-                 - "❌ Do not merge yet" (breaking change, unresolved
-                   compatibility risk or bugs)
-                 followed by one or two sentences explaining why, and what
-                 should be verified on a real installation before or after
-                 merging, if anything.
-            - Use `mcp__github_inline_comment__create_inline_comment` (with
-              `confirmed: true`) for specific lines with a concrete problem.
-            - Be concrete and cite file:line. If unsure, say so instead of guessing.
-            - Only post GitHub comments; don't submit review text as messages.
+            Output: post ONE top-level comment with `gh pr comment <number> --body ...`.
+
+            Write it for a busy maintainer and a contributor who may not be a native
+            English speaker: short sentences, plain English, explain effects in terms
+            of what users notice (e.g. "the car gets woken up", "evcc shows a wrong
+            battery level") instead of code terms. Report only what matters; leave
+            out anything that is fine, speculative or a matter of taste. The visible
+            part must stay under about 200 words. Use exactly this template:
+
+            ### <✅ Ready to merge | 🟡 Merge after the to-dos | ❌ Do not merge yet>
+            <One or two sentences for @${{ github.repository_owner }}: why, in plain words.>
+
+            **Impact on existing users:** <one sentence, or "None – the change is
+            additive.">
+
+            **To-do for the author**
+            - [ ] <one short action per line, most important first, at most 5;
+                  if nothing is left: "- [x] Nothing left to do">
+
+            **Test before merging:** <one sentence on what to try on a real
+            installation, or omit this line if nothing special>
+
+            <details><summary>Technical details</summary>
+
+            <For each to-do and finding: a short bullet with file:line, what is
+            wrong and how to fix it. Mention here anything you could not verify.>
+
+            </details>
+
+            Choose ✅ only if there is no compatibility risk and no to-do; 🟡 if only
+            small, low-risk to-dos remain; ❌ for breaking changes, unresolved
+            compatibility risks or real bugs.
+
+            Inline comments: use `mcp__github_inline_comment__create_inline_comment`
+            (with `confirmed: true`) only for the at most 3 most important problems,
+            each in one or two sentences.
+
+            Be concrete. If unsure, say so instead of guessing. Only post GitHub
+            comments; don't submit review text as messages.
           claude_args: |
             --allowedTools "Read,Grep,Glob,mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
