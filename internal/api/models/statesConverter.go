@@ -73,6 +73,54 @@ MISSING
 	OffPeakChargingEnabled      bool        `json:"off_peak_charging_enabled"`
 */
 
+// shiftStateFromBle converts the DriveState shift_state oneof into the string
+// representation used by the Tesla Fleet API ("P", "R", "N", "D"). An unset or
+// invalid shift state is returned as an empty string.
+func shiftStateFromBle(shiftState *carserver.ShiftState) string {
+	switch shiftState.GetType().(type) {
+	case *carserver.ShiftState_P:
+		return "P"
+	case *carserver.ShiftState_R:
+		return "R"
+	case *carserver.ShiftState_N:
+		return "N"
+	case *carserver.ShiftState_D:
+		return "D"
+	case *carserver.ShiftState_SNA:
+		// SNA = signal not available; treat it like an unset shift state.
+		return ""
+	default:
+		return ""
+	}
+}
+
+// speedFromBle returns the vehicle speed, preferring the newer speed_float
+// field. When speed_float is not present it falls back to the older integer
+// speed field. Presence is detected via the optional oneof accessors, since a
+// value of 0 cannot otherwise be distinguished from an unset field.
+func speedFromBle(driveState *carserver.DriveState) float32 {
+	if driveState.GetOptionalSpeedFloat() != nil {
+		return driveState.GetSpeedFloat()
+	}
+	if driveState.GetOptionalSpeed() != nil {
+		return float32(driveState.GetSpeed())
+	}
+	return 0
+}
+
+func DriveStateFromBle(VehicleData *carserver.VehicleData) DriveState {
+	return DriveState{
+		Timestamp:  VehicleData.DriveState.GetTimestamp().AsTime().Unix(),
+		ShiftState: shiftStateFromBle(VehicleData.DriveState.GetShiftState()),
+		Speed:      speedFromBle(VehicleData.DriveState),
+		Power:      VehicleData.DriveState.GetPower(),
+		// The Fleet API historically exposes the odometer in vehicle_state, but
+		// the BLE protocol delivers it in DriveState as hundredths of a mile, so
+		// convert it to miles and expose it here.
+		Odometer: float64(VehicleData.DriveState.GetOdometerInHundredthsOfAMile()) / 100.0,
+	}
+}
+
 func ClimateStateFromBle(VehicleData *carserver.VehicleData) ClimateState {
 	return ClimateState{
 		Timestamp:                              VehicleData.ClimateState.GetTimestamp().AsTime().Unix(),
