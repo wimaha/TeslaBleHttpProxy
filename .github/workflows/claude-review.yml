@@ -95,7 +95,16 @@ jobs:
                  before this PR can be merged (fixes, tests, docs, things to
                  verify), most important first, one action per item, each
                  referencing the file:line or finding it comes from. If
-                 nothing is left to do, write "- [x] Nothing left to do".
+                 nothing is left to do, write "- [x] Nothing left to do for
+                 the author".
+              6. "Merge recommendation for @${{ github.repository_owner }}": exactly one of
+                 - "✅ Ready to merge" (checklist empty, no compatibility risk)
+                 - "🟡 Merge after the checklist is done" (only minor items left)
+                 - "❌ Do not merge yet" (breaking change, unresolved
+                   compatibility risk or bugs)
+                 followed by one or two sentences explaining why, and what
+                 should be verified on a real installation before or after
+                 merging, if anything.
             - Use `mcp__github_inline_comment__create_inline_comment` (with
               `confirmed: true`) for specific lines with a concrete problem.
             - Be concrete and cite file:line. If unsure, say so instead of guessing.
