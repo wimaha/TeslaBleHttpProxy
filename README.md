@@ -176,6 +176,11 @@ Set cabin temperature to 21 °C (Celsius, 15-28; `passenger_temp` is optional an
 Open or close the rear trunk (`front` opens the frunk; it cannot be closed remotely):
 `http://localhost:8080/api/1/vehicles/{VIN}/command/actuate_trunk` with body `{"which_trunk": "rear"}`
 
+Notes on these two commands:
+- Both need a key with the **Owner** role. The car refuses them for a Charging Manager key.
+- `rear` is a **toggle**: it opens a closed trunk and closes an open one. A failed `rear` command is not retried, because the car may already have moved the trunk before the reply was lost. Read `closure_statuses.rear_trunk` from `body_controller_state` before sending it again.
+- An invalid body (for example `driver_temp` out of range) is rejected with `result: false` before the proxy connects to the car, so it does not wake the car.
+
 Explicitly wake up the vehicle:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/wake_up`
 

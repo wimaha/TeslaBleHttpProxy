@@ -317,6 +317,21 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	return false, nil
 }
 
+// ValidateBody checks a command body before the command is queued, so a bad body is
+// rejected without connecting to (and possibly waking) the car. Commands without a
+// check here are validated in Send only.
+func ValidateBody(command string, body map[string]interface{}) error {
+	switch command {
+	case "set_temps":
+		_, _, err := parseTemps(body)
+		return err
+	case "actuate_trunk":
+		_, err := parseWhichTrunk(body)
+		return err
+	}
+	return nil
+}
+
 // parseFloatField reads a numeric body field that may arrive as a JSON number or a string.
 func parseFloatField(body map[string]interface{}, key string) (float32, bool, error) {
 	raw, ok := body[key]

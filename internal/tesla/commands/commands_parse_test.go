@@ -67,6 +67,30 @@ func TestParseWhichTrunk(t *testing.T) {
 	}
 }
 
+func TestValidateBody(t *testing.T) {
+	tests := []struct {
+		command string
+		body    map[string]interface{}
+		wantErr bool
+	}{
+		{"set_temps", map[string]interface{}{"driver_temp": 21.0}, false},
+		{"set_temps", map[string]interface{}{"driver_temp": 40.0}, true},
+		{"set_temps", nil, true},
+		{"actuate_trunk", map[string]interface{}{"which_trunk": "rear"}, false},
+		{"actuate_trunk", map[string]interface{}{"which_trunk": "side"}, true},
+		{"actuate_trunk", nil, true},
+		// commands without a pre-queue check pass through unchanged
+		{"door_unlock", nil, false},
+		{"set_charging_amps", nil, false},
+	}
+	for _, tt := range tests {
+		err := ValidateBody(tt.command, tt.body)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("ValidateBody(%s, %v) err = %v, wantErr %v", tt.command, tt.body, err, tt.wantErr)
+		}
+	}
+}
+
 // Invalid bodies must be rejected before anything is sent to the car, and must not be retried.
 func TestInvalidBodyNotRetried(t *testing.T) {
 	for _, cmd := range []string{"set_temps", "actuate_trunk"} {
