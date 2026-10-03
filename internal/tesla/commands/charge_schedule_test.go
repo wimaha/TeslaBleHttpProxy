@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
@@ -103,8 +104,13 @@ func TestChargeScheduleRejectsBadInput(t *testing.T) {
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
-			if got, err := chargeScheduleFromBody(decode(t, raw)); err == nil {
-				t.Errorf("expected an error, got schedule %+v", got)
+			got, err := chargeScheduleFromBody(decode(t, raw))
+			if err == nil {
+				t.Fatalf("expected an error, got schedule %+v", got)
+			}
+			var bad *InvalidInputError
+			if !errors.As(err, &bad) {
+				t.Errorf("error %v is not an InvalidInputError, so the API would report success", err)
 			}
 		})
 	}

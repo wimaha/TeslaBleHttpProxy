@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -548,6 +549,10 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		}
 
 		if !retry {
+			var badInput *commands.InvalidInputError
+			if errors.As(err, &badInput) {
+				return nil, err, ctx
+			}
 			return nil, nil, ctx
 		}
 

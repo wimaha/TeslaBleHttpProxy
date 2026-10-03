@@ -10,6 +10,16 @@ import (
 
 const maxMinuteOfDay = 1439 // 23:59
 
+// InvalidInputError marks a request the caller got wrong. Unlike a failed send it must reach the
+// caller as an error: the retry loop otherwise drops the error of a command that is not retried.
+type InvalidInputError struct{ msg string }
+
+func (e *InvalidInputError) Error() string { return e.msg }
+
+func invalidInput(format string, args ...interface{}) error {
+	return &InvalidInputError{msg: fmt.Sprintf(format, args...)}
+}
+
 // chargeScheduleFromBody builds the schedule from the JSON body of add_charge_schedule.
 // Fields that are absent stay at their zero value; fields that are present but of the wrong
 // type or out of range are an error, so a typo never turns into a schedule on the wrong days.
@@ -44,7 +54,7 @@ func chargeScheduleFromBody(body map[string]interface{}) (*vehicle.ChargeSchedul
 		return nil, err
 	}
 	if schedule.StartEnabled && !startGiven {
-		return nil, fmt.Errorf("start_time is required when start_enabled is true")
+		return nil, invalidInput("start_time is required when start_enabled is true")
 	}
 	schedule.StartTime = int32(start)
 
@@ -53,7 +63,7 @@ func chargeScheduleFromBody(body map[string]interface{}) (*vehicle.ChargeSchedul
 		return nil, err
 	}
 	if schedule.EndEnabled && !endGiven {
-		return nil, fmt.Errorf("end_time is required when end_enabled is true")
+		return nil, invalidInput("end_time is required when end_enabled is true")
 	}
 	schedule.EndTime = int32(end)
 
@@ -83,7 +93,7 @@ func chargeScheduleIDFromBody(body map[string]interface{}) (uint64, error) {
 		return 0, err
 	}
 	if !ok {
-		return 0, fmt.Errorf("id missing in body")
+		return 0, invalidInput("id missing in body")
 	}
 	return uint64(id), nil
 }
@@ -95,7 +105,7 @@ func boolField(body map[string]interface{}, key string) (bool, error) {
 	}
 	v, ok := raw.(bool)
 	if !ok {
-		return false, fmt.Errorf("%s must be true or false", key)
+		return false, invalidInput("%s must be true or false", key)
 	}
 	return v, nil
 }
@@ -108,7 +118,7 @@ func intField(body map[string]interface{}, key string, min, max int64) (int64, b
 	}
 	v, ok := raw.(float64)
 	if !ok || v != math.Trunc(v) || v < float64(min) || v > float64(max) {
-		return 0, true, fmt.Errorf("%s must be a whole number between %d and %d", key, min, max)
+		return 0, true, invalidInput("%s must be a whole number between %d and %d", key, min, max)
 	}
 	return int64(v), true, nil
 }
@@ -121,7 +131,7 @@ func floatField(body map[string]interface{}, key string, min, max float64) (floa
 	}
 	v, ok := raw.(float64)
 	if !ok || v < min || v > max {
-		return 0, fmt.Errorf("%s must be a number between %v and %v", key, min, max)
+		return 0, invalidInput("%s must be a number between %v and %v", key, min, max)
 	}
 	return v, nil
 }
@@ -130,13 +140,13 @@ func parseDaysOfWeekValue(raw interface{}) (int32, error) {
 	switch v := raw.(type) {
 	case float64:
 		if v != math.Trunc(v) || v < 0 || v > 127 {
-			return 0, fmt.Errorf("days_of_week as a number must be a bitmask between 0 and 127")
+			return 0, invalidInput("days_of_week as a number must be a bitmask between 0 and 127")
 		}
 		return int32(v), nil
 	case string:
 		return parseDaysOfWeek(v)
 	default:
-		return 0, fmt.Errorf("days_of_week must be a bitmask number or text such as \"Monday,Friday\"")
+		return 0, invalidInput("days_of_week must be a bitmask number or text such as \"Monday,Friday\"")
 	}
 }
 
@@ -156,7 +166,7 @@ func parseDaysOfWeek(days string) (int32, error) {
 		name := strings.ToLower(strings.TrimSpace(d))
 		bit, ok := dayMap[name]
 		if !ok {
-			return 0, fmt.Errorf("unknown day %q in days_of_week", strings.TrimSpace(d))
+			return 0, invalidInput("unknown day %q in days_of_week", strings.TrimSpace(d))
 		}
 		mask |= bit
 	}
