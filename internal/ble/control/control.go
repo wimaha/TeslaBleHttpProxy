@@ -441,6 +441,12 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 		if connectionCtx.Err() != nil {
 			return true, cmd
 		}
+		// A request the caller got wrong says nothing about the connection: keep it open for the
+		// commands queued behind it.
+		var badInput *commands.InvalidInputError
+		if errors.As(err, &badInput) {
+			return false, nil
+		}
 		// If the context is not done, return to retry the command
 		if err != nil && ctx.Err() == nil {
 			return true, cmd

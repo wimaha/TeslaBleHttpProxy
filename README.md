@@ -148,7 +148,7 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - add_charge_schedule
 - remove_charge_schedule
 
-By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`.
+By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`. Without `wait=true`, a request is answered with success as soon as it is queued, so an invalid body of `add_charge_schedule` or `remove_charge_schedule` is only reported (with a reason) when `wait=true` is set.
 
 **Wake Up Behavior:** Commands **automatically wake up** the vehicle if it is asleep. You don't need to manually wake the vehicle or use any parameters - the proxy handles this automatically to ensure commands execute successfully.
 
