@@ -92,6 +92,7 @@ type Config struct {
 	ScanTimeout          int // Seconds to scan for BLE devices
 	CacheMaxAge          int // Seconds for HTTP Cache-Control header max-age (used for body controller state responses). If set to 0, cache headers are disabled.
 	VehicleDataCacheTime int // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
+	ConnectionTimeout    int // Seconds to keep the BLE connection open after a command before releasing the adapter to BlueZ. Lower = share adapter sooner; higher = batch follow-up commands.
 }
 
 var AppConfig *Config
@@ -145,12 +146,24 @@ func LoadConfig() *Config {
 	}
 	logging.Info("Env:", "vehicleDataCacheTime", vehicleDataCacheTimeInt)
 
+	connectionTimeout := os.Getenv("connectionTimeout")
+	if connectionTimeout == "" {
+		connectionTimeout = "10" // default value: 10 seconds
+	}
+	connectionTimeoutInt, err := strconv.Atoi(connectionTimeout)
+	if err != nil {
+		logging.Error("Invalid connectionTimeout value, using default (10)", "error", err)
+		connectionTimeoutInt = 10
+	}
+	logging.Info("Env:", "connectionTimeout", connectionTimeoutInt)
+
 	return &Config{
 		LogLevel:             envLogLevel,
 		HttpListenAddress:    addr,
 		CacheMaxAge:          cacheMaxAgeInt,
 		ScanTimeout:          scanTimeoutInt,
 		VehicleDataCacheTime: vehicleDataCacheTimeInt,
+		ConnectionTimeout:    connectionTimeoutInt,
 	}
 }
 

@@ -75,6 +75,11 @@ func (bc *BleControl) Loop() {
 			logging.Info("Retrying command", "Command", retryCommand.Command, "Body", retryCommand.Body)
 			retryCommand = bc.connectToVehicleAndOperateConnection(retryCommand)
 		} else {
+			// No pending retry: release the BLE adapter back to BlueZ while idle
+			// so BlueZ D-Bus and other tools can use it between command sessions.
+			if err := ble.CloseAdapter(); err != nil {
+				logging.Debug("Failed to release BLE adapter", "error", err)
+			}
 			logging.Debug("Waiting for next command ...")
 			// Wait for the next command
 			select {
@@ -403,7 +408,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *commands.Command) *commands.Command {
 	logging.Debug("Operating connection ...")
 	//defer log.Debug("operating connection done")
-	connectionCtx, cancel := context.WithTimeout(context.Background(), 29*time.Second)
+	connectionCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.AppConfig.ConnectionTimeout)*time.Second)
 	defer cancel()
 
 	cmd, err, _ := bc.ExecuteCommand(car, firstCommand, connectionCtx)
