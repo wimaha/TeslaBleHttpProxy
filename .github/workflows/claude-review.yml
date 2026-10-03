@@ -88,7 +88,21 @@ jobs:
             of what users notice (e.g. "the car gets woken up", "evcc shows a wrong
             battery level") instead of code terms. Report only what matters; leave
             out anything that is fine, speculative or a matter of taste. The visible
-            part must stay under about 200 words. Use exactly this template:
+            part must stay under about 200 words.
+
+            Shortening must never drop a real risk. These ALWAYS go into the to-do
+            list, ahead of everything else, even if that exceeds the word limit:
+            - anything that can make the car do something the user did not ask for
+              or not expect: move, open/close, lock/unlock, wake up, start/stop
+              charging, change climate - including a command being sent twice by
+              a retry, or a toggle being repeated;
+            - anything that can drain the 12V or main battery or keep the car awake;
+            - security problems (e.g. unauthenticated access, key handling);
+            - breaking changes for existing users or integrations.
+            A PR with any of these is ❌ unless the risk is clearly harmless.
+            Also keep to-dos for unclear units or data formats in API responses.
+
+            Use exactly this template:
 
             ### <✅ Ready to merge | 🟡 Merge after the to-dos | ❌ Do not merge yet>
             <One or two sentences for @${{ github.repository_owner }}: why, in plain words.>
@@ -97,7 +111,8 @@ jobs:
             additive.">
 
             **To-do for the author**
-            - [ ] <one short action per line, most important first, at most 5;
+            - [ ] <one short action per line, most important first, normally at
+                  most 5 (more only for the always-listed risks above);
                   if nothing is left: "- [x] Nothing left to do">
 
             **Test before merging:** <one sentence on what to try on a real
