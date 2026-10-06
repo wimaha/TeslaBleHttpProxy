@@ -272,7 +272,9 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			return false, err
 		}
 		if err := car.AddChargeSchedule(ctx, schedule); err != nil {
-			return true, fmt.Errorf("failed to add charge schedule: %s", err)
+			// Without an id the car creates a new schedule: if it stored it but the reply was lost,
+			// a retry would add a second one. Updating by id is safe to retry.
+			return schedule.Id != 0, fmt.Errorf("failed to add charge schedule: %s", err)
 		}
 	case "remove_charge_schedule":
 		id, err := chargeScheduleIDFromBody(command.Body)

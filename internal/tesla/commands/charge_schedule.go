@@ -21,7 +21,8 @@ func invalidInput(format string, args ...interface{}) error {
 }
 
 // chargeScheduleFromBody builds the schedule from the JSON body of add_charge_schedule.
-// Fields that are absent stay at their zero value; fields that are present but of the wrong
+// lat, lon and days_of_week are required; other absent fields stay at their zero value (so a
+// missing enabled means a disabled schedule). Fields that are present but of the wrong
 // type or out of range are an error, so a typo never turns into a schedule on the wrong days.
 //
 // days_of_week is either the Fleet API integer bitmask (Sunday=1 ... Saturday=64) or text:
@@ -67,6 +68,12 @@ func chargeScheduleFromBody(body map[string]interface{}) (*vehicle.ChargeSchedul
 	}
 	schedule.EndTime = int32(end)
 
+	// A schedule at 0,0 or without days is stored by the car but never applies, so these are required.
+	for _, key := range []string{"lat", "lon", "days_of_week"} {
+		if _, present := body[key]; !present {
+			return nil, invalidInput("%s is required", key)
+		}
+	}
 	lat, err := floatField(body, "lat", -90, 90)
 	if err != nil {
 		return nil, err
@@ -78,10 +85,8 @@ func chargeScheduleFromBody(body map[string]interface{}) (*vehicle.ChargeSchedul
 	}
 	schedule.Longitude = float32(lon)
 
-	if raw, present := body["days_of_week"]; present {
-		if schedule.DaysOfWeek, err = parseDaysOfWeekValue(raw); err != nil {
-			return nil, err
-		}
+	if schedule.DaysOfWeek, err = parseDaysOfWeekValue(body["days_of_week"]); err != nil {
+		return nil, err
 	}
 	return schedule, nil
 }

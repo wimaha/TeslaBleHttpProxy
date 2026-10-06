@@ -74,7 +74,7 @@ func TestParseDaysOfWeekNames(t *testing.T) {
 
 func TestDaysOfWeekAsFleetBitmask(t *testing.T) {
 	got, err := chargeScheduleFromBody(decode(t,
-		`{"days_of_week": 34, "start_enabled": true, "start_time": 600}`))
+		`{"lat": 50.1, "lon": 14.4, "days_of_week": 34, "start_enabled": true, "start_time": 600}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,13 +104,32 @@ func TestChargeScheduleRejectsBadInput(t *testing.T) {
 	}
 	for name, raw := range cases {
 		t.Run(name, func(t *testing.T) {
-			got, err := chargeScheduleFromBody(decode(t, raw))
+			// on top of a valid body, so each case fails for its own field only
+			body := decode(t, `{"lat": 50.1, "lon": 14.4, "days_of_week": "All"}`)
+			for k, v := range decode(t, raw) {
+				body[k] = v
+			}
+			got, err := chargeScheduleFromBody(body)
 			if err == nil {
 				t.Fatalf("expected an error, got schedule %+v", got)
 			}
 			var bad *InvalidInputError
 			if !errors.As(err, &bad) {
 				t.Errorf("error %v is not an InvalidInputError, so the API would report success", err)
+			}
+		})
+	}
+}
+
+func TestChargeScheduleRequiresLocationAndDays(t *testing.T) {
+	for _, key := range []string{"lat", "lon", "days_of_week"} {
+		t.Run(key, func(t *testing.T) {
+			body := decode(t, bodyEndTime)
+			delete(body, key)
+			_, err := chargeScheduleFromBody(body)
+			var bad *InvalidInputError
+			if !errors.As(err, &bad) {
+				t.Fatalf("missing %s: got %v, want an InvalidInputError", key, err)
 			}
 		})
 	}

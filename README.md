@@ -174,7 +174,7 @@ Explicitly wake up the vehicle:
 Add a charging schedule (times are minutes after midnight, so 600 is 10:00):
 `http://localhost:8080/api/1/vehicles/{VIN}/command/add_charge_schedule` with body `{"lat": 50.1, "lon": 14.4, "days_of_week": "Monday,Friday", "start_enabled": true, "start_time": 600, "end_enabled": true, "end_time": 720, "one_time": false, "enabled": true}`
 
-`days_of_week` is either the Fleet API bitmask (Sunday=1, Monday=2, Tuesday=4, Wednesday=8, Thursday=16, Friday=32, Saturday=64, so `34` is Monday and Friday) or text: `All`, `Weekdays` or comma-separated full day names. Include `id` to change an existing schedule instead of creating a new one. Unknown day names, wrong types and times outside 0-1439 are rejected with an error.
+`days_of_week` is either the Fleet API bitmask (Sunday=1, Monday=2, Tuesday=4, Wednesday=8, Thursday=16, Friday=32, Saturday=64, so `34` is Monday and Friday) or text: `All`, `Weekdays` or comma-separated full day names. `lat`, `lon` and `days_of_week` are required: a schedule at 0,0 or without days would be stored but never apply. Every call without `id` creates a new schedule, so include `id` to change an existing one. Omitted `enabled`, `start_enabled`, `end_enabled` and `one_time` are false. A failed call without `id` is not retried, to avoid a duplicate schedule. Unknown day names, wrong types and times outside 0-1439 are rejected with an error.
 
 Remove a charging schedule:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/remove_charge_schedule` with body `{"id": 3}`
