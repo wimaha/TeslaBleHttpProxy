@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -440,6 +441,12 @@ func (bc *BleControl) operateConnection(car *vehicle.Vehicle, firstCommand *comm
 		if connectionCtx.Err() != nil {
 			return true, cmd
 		}
+		// A request the caller got wrong says nothing about the connection: keep it open for the
+		// commands queued behind it.
+		var badInput *commands.InvalidInputError
+		if errors.As(err, &badInput) {
+			return false, nil
+		}
 		// If the context is not done, return to retry the command
 		if err != nil && ctx.Err() == nil {
 			return true, cmd
@@ -548,6 +555,10 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 		}
 
 		if !retry {
+			var badInput *commands.InvalidInputError
+			if errors.As(err, &badInput) {
+				return nil, err, ctx
+			}
 			return nil, nil, ctx
 		}
 

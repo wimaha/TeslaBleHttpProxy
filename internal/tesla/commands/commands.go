@@ -16,7 +16,7 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
-var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode"}
+var ExceptedCommands = []string{"vehicle_data", "auto_conditioning_start", "auto_conditioning_stop", "charge_port_door_open", "charge_port_door_close", "flash_lights", "wake_up", "set_charging_amps", "set_charge_limit", "charge_start", "charge_stop", "session_info", "honk_horn", "door_lock", "door_unlock", "set_sentry_mode", "add_charge_schedule", "remove_charge_schedule"}
 var ExceptedEndpoints = []string{"charge_state", "climate_state", "drive_state"}
 
 func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldRetry bool, err error) {
@@ -266,6 +266,24 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			return true, fmt.Errorf("failed to marshal body-controller-state: %s", err)
 		}
 		command.Response.Response = vsJson
+	case "add_charge_schedule":
+		schedule, err := chargeScheduleFromBody(command.Body)
+		if err != nil {
+			return false, err
+		}
+		if err := car.AddChargeSchedule(ctx, schedule); err != nil {
+			// Without an id the car creates a new schedule: if it stored it but the reply was lost,
+			// a retry would add a second one. Updating by id is safe to retry.
+			return schedule.Id != 0, fmt.Errorf("failed to add charge schedule: %s", err)
+		}
+	case "remove_charge_schedule":
+		id, err := chargeScheduleIDFromBody(command.Body)
+		if err != nil {
+			return false, err
+		}
+		if err := car.RemoveChargeSchedule(ctx, id); err != nil {
+			return true, fmt.Errorf("failed to remove charge schedule: %s", err)
+		}
 	default:
 		return false, fmt.Errorf("unrecognized command: %s", command.Command)
 	}
