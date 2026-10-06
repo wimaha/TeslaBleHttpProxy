@@ -56,6 +56,18 @@ type ChargeState struct {
 	MinutesToFullCharge            int32       `json:"minutes_to_full_charge"`            //
 }
 
+// DriveState contains the current drive states available from the vehicle.
+type DriveState struct {
+	Timestamp  int64   `json:"timestamp"`   //
+	ShiftState string  `json:"shift_state"` //
+	Speed      float32 `json:"speed"`       //
+	Power      int32   `json:"power"`       //
+	// Odometer is expressed in miles. The Tesla Fleet API historically returns
+	// the odometer in vehicle_state, but the BLE protocol delivers it in
+	// DriveState, so it is exposed here.
+	Odometer float64 `json:"odometer"` //
+}
+
 // ClimateState contains the current climate states available from the vehicle.
 type ClimateState struct {
 	Timestamp                              int64       `json:"timestamp"`                                  //
