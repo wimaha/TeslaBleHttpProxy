@@ -31,6 +31,8 @@ var (
 	vehicleDataCacheMux sync.RWMutex
 )
 
+var vehicleOutOfRange = true
+
 func commonDefer(w http.ResponseWriter, response *models.Response) {
 	var ret models.Ret
 	ret.Response = *response
@@ -176,6 +178,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 			} else {
 				// Cache expired for this endpoint
 				logging.Debug("VehicleData endpoint cache expired", "VIN", vin, "Endpoint", endpoint, "Age", age)
+				cachedData[endpoint] = cachedEntry.data
 				missingEndpoints = append(missingEndpoints, endpoint)
 			}
 		} else {
@@ -213,10 +216,16 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	apiResponse.Ctx = r.Context()
 
 	wg.Add(1)
-	autoWakeup := r.URL.Query().Get("wakeup") == "true"
+	autoWakeup := r.URL.Query().Get("wakeup") == "true" || vehicleOutOfRange
 	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse, autoWakeup)
 
 	wg.Wait()
+
+	if !apiResponse.Result && strings.Contains(apiResponse.Error, "not in range") && !vehicleOutOfRange {
+		logging.Debug("Vehicle out of range. Setting bool vehicleOutOfRange", "VIN", vin)
+		fmt.Printf("Vehicle out of range. Setting bool vehicleOutOfRange")
+		vehicleOutOfRange = true
+	}
 
 	if apiResponse.Result {
 		// Parse the BLE response to extract individual endpoint data
@@ -256,6 +265,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		vehicleOutOfRange = false
 		response.Result = true
 		response.Reason = "The request was successfully processed."
 		response.Response = responseJson
@@ -267,12 +277,15 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 			for endpoint, data := range cachedData {
 				combinedResponse[endpoint] = data
 			}
+
 			responseJson, err := json.Marshal(combinedResponse)
 			if err != nil {
 				response.Result = false
 				response.Reason = apiResponse.Error
+
 				return
 			}
+
 			response.Result = true
 			response.Reason = "The request was partially processed from cache. Some data may be stale."
 			response.Response = responseJson

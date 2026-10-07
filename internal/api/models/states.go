@@ -12,7 +12,7 @@ type ChargeState struct {
 	NotEnoughPowerToHeat           bool        `json:"not_enough_power_to_heat"`          //
 	MaxRangeChargeCounter          int32       `json:"max_range_charge_counter"`          //
 	FastChargerPresent             bool        `json:"fast_charger_present"`              //
-	FastChargerType                string      `json:"fast_charger_type"`                 //
+	FastChargerType                *string     `json:"fast_charger_type,omitempty"`       //
 	BatteryRange                   float32     `json:"battery_range"`                     //
 	EstBatteryRange                float32     `json:"est_battery_range"`                 //
 	IdealBatteryRange              float32     `json:"ideal_battery_range"`               //
@@ -51,8 +51,8 @@ type ChargeState struct {
 	ManagedChargingStartTime       interface{} `json:"managed_charging_start_time"`       //
 	ChargePortcoldWeatherMode      bool        `json:"charge_port_cold_weather_mode"`     //
 	ChargePortColor                string      `json:"charge_port_color"`                 //
-	ConnChargeCable                string      `json:"conn_charge_cable"`                 //
-	FastChargerBrand               string      `json:"fast_charger_brand"`                //
+	ConnChargeCable                *string     `json:"conn_charge_cable,omitempty"`       //
+	FastChargerBrand               *string     `json:"fast_charger_brand,omitempty"`      //
 	MinutesToFullCharge            int32       `json:"minutes_to_full_charge"`            //
 }
 
