@@ -559,6 +559,13 @@ func (bc *BleControl) ExecuteCommand(car *vehicle.Vehicle, command *commands.Com
 			if errors.As(err, &badInput) {
 				return nil, err, ctx
 			}
+			// A send that must not be repeated (rear trunk toggle) failed: tell the caller instead
+			// of reporting success. The returned command is nil, so it is never re-run.
+			var notRetried *commands.NotRetriedError
+			if errors.As(err, &notRetried) {
+				logging.Error("Failed, not retried", "Command", command.Command, "Body", command.Body, "Error", err)
+				return nil, err, ctx
+			}
 			return nil, nil, ctx
 		}
 

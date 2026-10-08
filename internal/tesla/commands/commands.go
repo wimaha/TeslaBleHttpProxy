@@ -79,7 +79,7 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 			// would move it back, so never retry: report the error and let the client
 			// check closure_statuses.rear_trunk before sending again.
 			if err := car.ActuateTrunk(ctx); err != nil {
-				return false, fmt.Errorf("failed to actuate trunk (not retried, it is a toggle): %s", err)
+				return false, notRetried("failed to actuate trunk (not retried, it is a toggle): %s", err)
 			}
 		}
 	case "set_sentry_mode":
@@ -317,6 +317,18 @@ func (command *Command) Send(ctx context.Context, car *vehicle.Vehicle) (shouldR
 	return false, nil
 }
 
+// NotRetriedError marks a send that failed and is deliberately not retried, because repeating it
+// is not safe (the rear trunk is a toggle: the car may have acted before the reply was lost).
+// Unlike other non-retried errors it is reported to the API caller, so a failed toggle does not
+// come back as result=true. The connection is still closed as after any failed send.
+type NotRetriedError struct{ msg string }
+
+func (e *NotRetriedError) Error() string { return e.msg }
+
+func notRetried(format string, args ...interface{}) error {
+	return &NotRetriedError{msg: fmt.Sprintf(format, args...)}
+}
+
 // ValidateBody checks a command body before the command is queued, so a bad body is
 // rejected without connecting to (and possibly waking) the car. Commands without a
 // check here are validated in Send only.
@@ -344,11 +356,11 @@ func parseFloatField(body map[string]interface{}, key string) (float32, bool, er
 	case string:
 		f, err := strconv.ParseFloat(strings.TrimSpace(v), 32)
 		if err != nil {
-			return 0, true, fmt.Errorf("%s parsing error: %s", key, err)
+			return 0, true, invalidInput("%s parsing error: %s", key, err)
 		}
 		return float32(f), true, nil
 	default:
-		return 0, true, fmt.Errorf("%s has unsupported type %T", key, raw)
+		return 0, true, invalidInput("%s has unsupported type %T", key, raw)
 	}
 }
 
@@ -360,7 +372,7 @@ func parseTemps(body map[string]interface{}) (float32, float32, error) {
 		return 0, 0, err
 	}
 	if !found {
-		return 0, 0, fmt.Errorf("driver_temp missing in body")
+		return 0, 0, invalidInput("driver_temp missing in body")
 	}
 	passenger, found, err := parseFloatField(body, "passenger_temp")
 	if err != nil {
@@ -371,7 +383,7 @@ func parseTemps(body map[string]interface{}) (float32, float32, error) {
 	}
 	for _, t := range []float32{driver, passenger} {
 		if t < 15 || t > 28 {
-			return 0, 0, fmt.Errorf("temperature %.1f out of range 15-28 °C", t)
+			return 0, 0, invalidInput("temperature %.1f out of range 15-28 °C", t)
 		}
 	}
 	return driver, passenger, nil
@@ -381,11 +393,11 @@ func parseTemps(body map[string]interface{}) (float32, float32, error) {
 func parseWhichTrunk(body map[string]interface{}) (string, error) {
 	raw, ok := body["which_trunk"]
 	if !ok || raw == nil {
-		return "", fmt.Errorf("which_trunk missing in body")
+		return "", invalidInput("which_trunk missing in body")
 	}
 	s, ok := raw.(string)
 	if !ok {
-		return "", fmt.Errorf("which_trunk has unsupported type %T", raw)
+		return "", invalidInput("which_trunk has unsupported type %T", raw)
 	}
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "rear":
@@ -393,6 +405,6 @@ func parseWhichTrunk(body map[string]interface{}) (string, error) {
 	case "front":
 		return "front", nil
 	default:
-		return "", fmt.Errorf("which_trunk must be \"rear\" or \"front\", got %q", s)
+		return "", invalidInput("which_trunk must be \"rear\" or \"front\", got %q", s)
 	}
 }

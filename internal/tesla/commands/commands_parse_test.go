@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
@@ -102,5 +103,22 @@ func TestInvalidBodyNotRetried(t *testing.T) {
 		if retry {
 			t.Errorf("%s with empty body: shouldRetry = true, want false", cmd)
 		}
+	}
+}
+
+// Parse errors must be InvalidInputError, so ExecuteCommand reports them and keeps the connection.
+func TestParseErrorsAreInvalidInput(t *testing.T) {
+	_, _, err := parseTemps(map[string]interface{}{"driver_temp": 40.0})
+	var bad *InvalidInputError
+	if !errors.As(err, &bad) {
+		t.Errorf("parseTemps error %v is not an InvalidInputError", err)
+	}
+	_, err = parseWhichTrunk(map[string]interface{}{"which_trunk": "side"})
+	if !errors.As(err, &bad) {
+		t.Errorf("parseWhichTrunk error %v is not an InvalidInputError", err)
+	}
+	var nr *NotRetriedError
+	if !errors.As(notRetried("x %d", 1), &nr) {
+		t.Errorf("notRetried() is not a NotRetriedError")
 	}
 }
