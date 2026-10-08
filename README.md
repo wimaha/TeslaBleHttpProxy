@@ -147,6 +147,8 @@ The program uses the same interfaces as the Tesla [Fleet API](https://developer.
 - set_sentry_mode
 - add_charge_schedule
 - remove_charge_schedule
+- set_temps
+- actuate_trunk
 
 By default, the program will return immediately after sending the command to the vehicle. If you want to wait for the command to complete, you can set the `wait` parameter to `true`. Without `wait=true`, a request is answered with success as soon as it is queued, so an invalid body of `add_charge_schedule` or `remove_charge_schedule` is only reported (with a reason) when `wait=true` is set.
 
@@ -167,6 +169,17 @@ Stop charging:
 
 Set charging amps to 5A:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/set_charging_amps` with body `{"charging_amps": "5"}`
+
+Set cabin temperature to 21 °C (Celsius, 15-28; `passenger_temp` is optional and defaults to `driver_temp`):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_temps` with body `{"driver_temp": 21, "passenger_temp": 21}`
+
+Open or close the rear trunk (`front` opens the frunk; it cannot be closed remotely):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/actuate_trunk` with body `{"which_trunk": "rear"}`
+
+Notes on these two commands:
+- Both need a key with the **Owner** role. The car refuses them for a Charging Manager key.
+- `rear` is a **toggle**: it opens a closed trunk and closes an open one. A failed `rear` command is not retried, because the car may already have moved the trunk before the reply was lost; it is reported as `result: false`. Read `closure_statuses.rear_trunk` from `body_controller_state` before sending it again.
+- An invalid body (for example `driver_temp` out of range) is rejected with `result: false` before the proxy connects to the car, so it does not wake the car.
 
 Explicitly wake up the vehicle:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/wake_up`
