@@ -91,6 +91,14 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reject a bad body before queuing, so it never connects to or wakes the car.
+	if err := commands.ValidateBody(command, body); err != nil {
+		logging.Error("Invalid body", "Command", command, "Error", err)
+		response.Reason = fmt.Sprintf("Invalid body for \"%s\": %s", command, err)
+		response.Result = false
+		return
+	}
+
 	if wait {
 		var apiResponse models.ApiResponse
 		wg := sync.WaitGroup{}
