@@ -239,6 +239,10 @@ This is recommended if you want to receive data frequently, since it will reduce
 
 The body controller state is fetched from the vehicle and returnes the state of the body controller. The request does not wake up the vehicle. The following information is returned:
 
+*(unreleased)*
+
+The request goes through the same queue as commands, so there is only ever one Bluetooth connection to the vehicle. If a connection is already open, it is answered on it right away. If the proxy is busy with another command (for example retrying while the vehicle is out of range), the request waits for at most 15 seconds and then answers with an error.
+
 - `vehicleLockState`
   - `VEHICLELOCKSTATE_UNLOCKED`
   - `VEHICLELOCKSTATE_LOCKED`
@@ -286,6 +290,12 @@ Due to BLE's power-saving design, Tesla vehicles may terminate connections after
 **Fix:** Close the Tesla app on mobile phones when not needed, especially if you're also wearing a smartwatch with the Tesla app. The proxy counts as one device, so limit other active BLE connections accordingly.
 
 This is a Tesla vehicle constraint, not a limitation of TeslaBleHttpProxy.
+
+### Sharing the Bluetooth adapter with other services
+
+*(unreleased)*
+
+By default the proxy keeps the Bluetooth adapter for itself while it runs, so other Bluetooth services on the same host (for example a door lock using BlueZ) report "No Bluetooth adapters found". Set [`releaseAdapterWhenIdle=true`](docs/environment_variables.md#releaseadapterwhenidle) to hand the adapter back whenever no connection to the car is open, and a lower [`connectionTimeout`](docs/environment_variables.md#connectiontimeout) such as `10` to free it sooner after a command.
 
 ### Dashboard buttons return 403 Forbidden
 

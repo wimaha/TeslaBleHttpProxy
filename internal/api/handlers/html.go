@@ -196,8 +196,7 @@ func RemoveKeys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	control.CloseBleControl()
-	control.SetupBleControl() // Reinitialize with new active key
+	control.SetupBleControl() // Reinitialize with new active key; stops the previous loop
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -319,8 +318,7 @@ func ActivateKey(w http.ResponseWriter, r *http.Request) {
 				Message: fmt.Sprintf("Active key changed to '%s'.", control.GetKeyRoleDisplayName(role)),
 				Type:    models.Success,
 			})
-			// Reinitialize BLE control with new active key
-			control.CloseBleControl()
+			// Reinitialize BLE control with new active key; stops the previous loop
 			control.SetupBleControl()
 		}
 	}

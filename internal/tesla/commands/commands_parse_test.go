@@ -80,9 +80,19 @@ func TestValidateBody(t *testing.T) {
 		{"actuate_trunk", map[string]interface{}{"which_trunk": "rear"}, false},
 		{"actuate_trunk", map[string]interface{}{"which_trunk": "side"}, true},
 		{"actuate_trunk", nil, true},
+		{"set_charging_amps", map[string]interface{}{"charging_amps": 16.0}, false},
+		{"set_charging_amps", map[string]interface{}{"charging_amps": " 16 "}, false},
+		{"set_charging_amps", map[string]interface{}{"charging_amps": "sixteen"}, true},
+		{"set_charging_amps", map[string]interface{}{"charging_amps": true}, true},
+		{"set_charging_amps", nil, true},
+		{"set_charge_limit", map[string]interface{}{"percent": "80"}, false},
+		{"set_charge_limit", map[string]interface{}{}, true},
+		{"set_sentry_mode", map[string]interface{}{"on": true}, false},
+		{"set_sentry_mode", map[string]interface{}{"on": "false"}, false},
+		{"set_sentry_mode", map[string]interface{}{"on": "maybe"}, true},
+		{"set_sentry_mode", nil, true},
 		// commands without a pre-queue check pass through unchanged
 		{"door_unlock", nil, false},
-		{"set_charging_amps", nil, false},
 	}
 	for _, tt := range tests {
 		err := ValidateBody(tt.command, tt.body)

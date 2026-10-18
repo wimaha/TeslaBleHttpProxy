@@ -82,18 +82,9 @@ func (command *Command) Send(ctx context.Context, car Vehicle) (shouldRetry bool
 			}
 		}
 	case "set_sentry_mode":
-		var on bool
-		switch v := command.Body["on"].(type) {
-		case bool:
-			on = v
-		case string:
-			if onBool, err := strconv.ParseBool(v); err == nil {
-				on = onBool
-			} else {
-				return false, fmt.Errorf("on parsing error: %s", err)
-			}
-		default:
-			return false, fmt.Errorf("on missing in body")
+		on, err := parseBoolField(command.Body, "on")
+		if err != nil {
+			return false, err
 		}
 		if err := car.SetSentryMode(ctx, on); err != nil {
 			return true, fmt.Errorf("failed to set sentry mode %s", err)
@@ -121,35 +112,17 @@ func (command *Command) Send(ctx context.Context, car Vehicle) (shouldRetry bool
 			return true, fmt.Errorf("failed to stop charge: %s", err)
 		}
 	case "set_charging_amps":
-		var chargingAmps int32
-		switch v := command.Body["charging_amps"].(type) {
-		case float64:
-			chargingAmps = int32(v)
-		case string:
-			if chargingAmps64, err := strconv.ParseInt(v, 10, 32); err == nil {
-				chargingAmps = int32(chargingAmps64)
-			} else {
-				return false, fmt.Errorf("charing Amps parsing error: %s", err)
-			}
-		default:
-			return false, fmt.Errorf("charing Amps missing in body")
+		chargingAmps, err := parseInt32Field(command.Body, "charging_amps")
+		if err != nil {
+			return false, err
 		}
 		if err := car.SetChargingAmps(ctx, chargingAmps); err != nil {
 			return true, fmt.Errorf("failed to set charging Amps to %d: %s", chargingAmps, err)
 		}
 	case "set_charge_limit":
-		var chargeLimit int32
-		switch v := command.Body["percent"].(type) {
-		case float64:
-			chargeLimit = int32(v)
-		case string:
-			if chargeLimit64, err := strconv.ParseInt(v, 10, 32); err == nil {
-				chargeLimit = int32(chargeLimit64)
-			} else {
-				return false, fmt.Errorf("charing Amps parsing error: %s", err)
-			}
-		default:
-			return false, fmt.Errorf("charing Amps missing in body")
+		chargeLimit, err := parseInt32Field(command.Body, "percent")
+		if err != nil {
+			return false, err
 		}
 		if err := car.ChangeChargeLimit(ctx, chargeLimit); err != nil {
 			return true, fmt.Errorf("failed to set charge limit to %d %%: %s", chargeLimit, err)
@@ -318,7 +291,7 @@ func (command *Command) Send(ctx context.Context, car Vehicle) (shouldRetry bool
 
 // NotRetriedError marks a send that failed and is deliberately not retried, because repeating it
 // is not safe (the rear trunk is a toggle: the car may have acted before the reply was lost).
-// Unlike other non-retried errors it is reported to the API caller, so a failed toggle does not
+// Like every non-retried error it is reported to the API caller, so a failed toggle does not
 // come back as result=true. The connection is still closed as after any failed send.
 type NotRetriedError struct{ msg string }
 
@@ -339,8 +312,53 @@ func ValidateBody(command string, body map[string]interface{}) error {
 	case "actuate_trunk":
 		_, err := parseWhichTrunk(body)
 		return err
+	case "set_charging_amps":
+		_, err := parseInt32Field(body, "charging_amps")
+		return err
+	case "set_charge_limit":
+		_, err := parseInt32Field(body, "percent")
+		return err
+	case "set_sentry_mode":
+		_, err := parseBoolField(body, "on")
+		return err
 	}
 	return nil
+}
+
+// parseInt32Field reads a required integer body field that may arrive as a JSON number or a string.
+func parseInt32Field(body map[string]interface{}, key string) (int32, error) {
+	switch v := body[key].(type) {
+	case float64:
+		return int32(v), nil
+	case string:
+		n, err := strconv.ParseInt(strings.TrimSpace(v), 10, 32)
+		if err != nil {
+			return 0, invalidInput("%s parsing error: %s", key, err)
+		}
+		return int32(n), nil
+	case nil:
+		return 0, invalidInput("%s missing in body", key)
+	default:
+		return 0, invalidInput("%s has unsupported type %T", key, v)
+	}
+}
+
+// parseBoolField reads a required boolean body field that may arrive as a JSON bool or a string.
+func parseBoolField(body map[string]interface{}, key string) (bool, error) {
+	switch v := body[key].(type) {
+	case bool:
+		return v, nil
+	case string:
+		b, err := strconv.ParseBool(strings.TrimSpace(v))
+		if err != nil {
+			return false, invalidInput("%s parsing error: %s", key, err)
+		}
+		return b, nil
+	case nil:
+		return false, invalidInput("%s missing in body", key)
+	default:
+		return false, invalidInput("%s has unsupported type %T", key, v)
+	}
 }
 
 // parseFloatField reads a numeric body field that may arrive as a JSON number or a string.

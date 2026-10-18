@@ -87,12 +87,14 @@ func GetKeyFilesForRole(role string) (string, string) {
 var Version = "*undefined*"
 
 type Config struct {
-	LogLevel             string
-	HttpListenAddress    string
-	ScanTimeout          int      // Seconds to scan for BLE devices
-	CacheMaxAge          int      // Seconds for HTTP Cache-Control header max-age (used for body controller state responses). If set to 0, cache headers are disabled.
-	VehicleDataCacheTime int      // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
-	TrustedOrigins       []string // Origins (scheme://host[:port]) allowed to send state-changing requests from a browser, e.g. a reverse proxy that rewrites the Host header.
+	LogLevel               string
+	HttpListenAddress      string
+	ScanTimeout            int      // Seconds to scan for BLE devices
+	CacheMaxAge            int      // Seconds for HTTP Cache-Control header max-age (used for body controller state responses). If set to 0, cache headers are disabled.
+	VehicleDataCacheTime   int      // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
+	TrustedOrigins         []string // Origins (scheme://host[:port]) allowed to send state-changing requests from a browser, e.g. a reverse proxy that rewrites the Host header.
+	ConnectionTimeout      int      // Seconds a BLE connection is kept open after a command for further commands.
+	ReleaseAdapterWhenIdle bool     // Hand the BLE adapter back to the system between connections, so other Bluetooth services can use it.
 }
 
 var AppConfig *Config
@@ -146,6 +148,26 @@ func LoadConfig() *Config {
 	}
 	logging.Info("Env:", "vehicleDataCacheTime", vehicleDataCacheTimeInt)
 
+	connectionTimeout := os.Getenv("connectionTimeout")
+	if connectionTimeout == "" {
+		connectionTimeout = "29" // default value
+	}
+	connectionTimeoutInt, err := strconv.Atoi(connectionTimeout)
+	if err != nil || connectionTimeoutInt <= 0 {
+		logging.Error("Invalid connectionTimeout value, using default (29)", "value", connectionTimeout, "error", err)
+		connectionTimeoutInt = 29
+	}
+	logging.Info("Env:", "connectionTimeout", connectionTimeoutInt)
+
+	releaseAdapterWhenIdle := false
+	if value := os.Getenv("releaseAdapterWhenIdle"); value != "" {
+		if releaseAdapterWhenIdle, err = strconv.ParseBool(value); err != nil {
+			logging.Error("Invalid releaseAdapterWhenIdle value, using default (false)", "value", value, "error", err)
+			releaseAdapterWhenIdle = false
+		}
+	}
+	logging.Info("Env:", "releaseAdapterWhenIdle", releaseAdapterWhenIdle)
+
 	var trustedOrigins []string
 	for _, origin := range strings.Split(os.Getenv("trustedOrigins"), ",") {
 		if origin = strings.TrimSpace(origin); origin != "" {
@@ -157,12 +179,14 @@ func LoadConfig() *Config {
 	}
 
 	return &Config{
-		LogLevel:             envLogLevel,
-		HttpListenAddress:    addr,
-		CacheMaxAge:          cacheMaxAgeInt,
-		ScanTimeout:          scanTimeoutInt,
-		VehicleDataCacheTime: vehicleDataCacheTimeInt,
-		TrustedOrigins:       trustedOrigins,
+		LogLevel:               envLogLevel,
+		HttpListenAddress:      addr,
+		CacheMaxAge:            cacheMaxAgeInt,
+		ScanTimeout:            scanTimeoutInt,
+		VehicleDataCacheTime:   vehicleDataCacheTimeInt,
+		TrustedOrigins:         trustedOrigins,
+		ConnectionTimeout:      connectionTimeoutInt,
+		ReleaseAdapterWhenIdle: releaseAdapterWhenIdle,
 	}
 }
 
