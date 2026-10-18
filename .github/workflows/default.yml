@@ -28,6 +28,22 @@ jobs:
     - name: Build
       run: make build
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ env.GO_VERSION }}
+        cache: false
+        id: go
+
+    - name: Test
+      run: make test
+
   lint:
     name: Lint
     runs-on: ubuntu-latest

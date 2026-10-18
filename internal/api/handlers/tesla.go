@@ -317,13 +317,10 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 		Vin:      vin,
 		Response: &apiResponse,
 	}
-	conn, car, _, err := control.BleControlInstance.TryConnectToVehicle(ctx, cmd)
+	car, _, err := control.BleControlInstance.TryConnectToVehicle(ctx, cmd)
 	if err == nil {
 		//Successful
-		defer conn.Close()
-		//defer log.Debug("close connection (A)")
 		defer car.Disconnect()
-		//defer log.Debug("disconnect vehicle (A)")
 
 		_, err, _ := control.BleControlInstance.ExecuteCommand(car, cmd, context.Background())
 		if err != nil {

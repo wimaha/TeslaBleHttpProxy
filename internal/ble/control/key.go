@@ -121,10 +121,7 @@ func RemoveKeyFiles() (error, error) {
 }
 
 func SendKeysToVehicle(vin string, role string) error {
-	tempBleControl := &BleControl{
-		privateKey:   nil,
-		commandStack: make(chan commands.Command, 1),
-	}
+	tempBleControl := New(nil, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -133,11 +130,9 @@ func SendKeysToVehicle(vin string, role string) error {
 		Vin:     vin,
 		Body:    map[string]interface{}{"role": role},
 	}
-	conn, car, _, err := tempBleControl.TryConnectToVehicle(ctx, cmd)
+	car, _, err := tempBleControl.TryConnectToVehicle(ctx, cmd)
 	if err == nil {
 		//Successful
-		defer conn.Close()
-		defer logging.Debug("close connection (A)")
 		defer car.Disconnect()
 		defer logging.Debug("disconnect vehicle (A)")
 
