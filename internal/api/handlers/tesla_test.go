@@ -2,16 +2,17 @@ package handlers_test
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	"github.com/wimaha/TeslaBleHttpProxy/config"
@@ -51,7 +52,7 @@ func startProxy(t *testing.T, vin string) *proxy {
 
 	previous := control.BleControlInstance
 	control.BleControlInstance = bc
-	server := httptest.NewServer(routes.SetupRoutes(embed.FS{}, embed.FS{}))
+	server := httptest.NewServer(routes.SetupRoutes(fstest.MapFS{}, os.DirFS("../../..")))
 	t.Cleanup(func() {
 		server.Close()
 		control.BleControlInstance = previous
