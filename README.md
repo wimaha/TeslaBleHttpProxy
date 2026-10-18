@@ -170,6 +170,12 @@ Stop charging:
 Set charging amps to 5A:
 `http://localhost:8080/api/1/vehicles/{VIN}/command/set_charging_amps` with body `{"charging_amps": "5"}`
 
+Set the charge limit to 80 %:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_charge_limit` with body `{"percent": 80}`
+
+Turn Sentry Mode on (`false` turns it off):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_sentry_mode` with body `{"on": true}`
+
 Set cabin temperature to 21 °C (Celsius, 15-28; `passenger_temp` is optional and defaults to `driver_temp`):
 `http://localhost:8080/api/1/vehicles/{VIN}/command/set_temps` with body `{"driver_temp": 21, "passenger_temp": 21}`
 
