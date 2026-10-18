@@ -1,5 +1,7 @@
 # TeslaBleHttpProxy
 
+> **Note:** This README describes the current development state (`main`, Docker `:dev`). For the latest release **2.4.0** (Docker `:latest`) see the [README of 2.4.0](https://github.com/wimaha/TeslaBleHttpProxy/blob/2.4.0/README.md). What changed since then is listed in the [CHANGELOG](CHANGELOG.md). Sections marked *(unreleased)* are only in `:dev`.
+
 TeslaBleHttpProxy is a program written in Go that receives HTTP requests and forwards them via Bluetooth to a Tesla vehicle. The program can, for example, be easily used together with [evcc](https://github.com/evcc-io/evcc).
 
 The program stores the received requests in a queue and processes them one by one. This ensures that only one Bluetooth connection to the vehicle is established at a time.
@@ -286,6 +288,8 @@ Due to BLE's power-saving design, Tesla vehicles may terminate connections after
 This is a Tesla vehicle constraint, not a limitation of TeslaBleHttpProxy.
 
 ### Dashboard buttons return 403 Forbidden
+
+*(unreleased)*
 
 The proxy rejects state-changing requests that a browser sends from another website, so a page you visit cannot change your keys or send commands to the car. If you open the dashboard through a reverse proxy over plain HTTP that rewrites the `Host` header, your own requests can look cross-site too. Set the [`trustedOrigins`](docs/environment_variables.md#trustedorigins) environment variable to the address you open in the browser, e.g. `trustedOrigins=http://nas.local:8080`. Over HTTPS this is not needed.
 

@@ -1,5 +1,7 @@
 # Installation
 
+> **Note:** This page describes the current development state (`main`, Docker `:dev`). Sections marked *(unreleased)* are not in the latest release yet, see the [CHANGELOG](../CHANGELOG.md).
+
 ## Step 1: Install Raspberry Pi OS
 
 Setup your raspberry Pi. You will find an installer here: https://www.raspberrypi.com/software/
