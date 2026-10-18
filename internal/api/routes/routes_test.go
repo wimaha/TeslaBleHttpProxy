@@ -84,11 +84,30 @@ func TestReverseProxyOriginNeedsTrust(t *testing.T) {
 	if code := serveTrusting(t, request(), nil); code != http.StatusForbidden {
 		t.Errorf("untrusted: status = %d, want %d", code, http.StatusForbidden)
 	}
-	if code := serveTrusting(t, request(), []string{"http://nas.local"}); code != http.StatusSeeOther {
+	if code := serveTrusting(t, request(), []string{"http://NAS.local:80/"}); code != http.StatusSeeOther {
 		t.Errorf("trusted: status = %d, want %d", code, http.StatusSeeOther)
 	}
 	// An invalid entry is logged and skipped instead of breaking startup.
 	if code := serveTrusting(t, request(), []string{"nas.local/path", "http://nas.local"}); code != http.StatusSeeOther {
 		t.Errorf("with invalid entry: status = %d, want %d", code, http.StatusSeeOther)
+	}
+}
+
+func TestNormalizeOrigin(t *testing.T) {
+	cases := map[string]string{
+		"http://nas.local":       "http://nas.local",
+		"http://nas.local/":      "http://nas.local",
+		"HTTP://NAS.local:80":    "http://nas.local",
+		"https://nas.local:443/": "https://nas.local",
+		"https://nas.local:80":   "https://nas.local:80",
+		"http://nas.local:8080":  "http://nas.local:8080",
+		"http://[::1]:8080":      "http://[::1]:8080",
+		"http://nas.local/path":  "http://nas.local/path", // left for AddTrustedOrigin to reject
+		"bogus":                  "bogus",
+	}
+	for in, want := range cases {
+		if got := normalizeOrigin(in); got != want {
+			t.Errorf("normalizeOrigin(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
