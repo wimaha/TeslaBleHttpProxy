@@ -47,13 +47,15 @@ func commonDefer(w http.ResponseWriter, response *models.Response) {
 	logging.Debug("Response", "Command", response.Command, "Status", status, "Result", response.Result, "Reason", response.Reason)
 }
 
-func checkBleControl(response *models.Response) bool {
-	if control.BleControlInstance == nil {
+// bleControl returns the active BleControl, read once so a key change during the request
+// cannot swap it out halfway. If there is none, it sets the response reason and returns nil.
+func bleControl(response *models.Response) *control.BleControl {
+	bc := control.Instance()
+	if bc == nil {
 		response.Reason = "BleControl is not initialized. Maybe private.pem is missing."
 		response.Result = false
-		return false
 	}
-	return true
+	return bc
 }
 
 func Command(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +74,8 @@ func Command(w http.ResponseWriter, r *http.Request) {
 
 	defer commonDefer(w, &response)
 
-	if !checkBleControl(&response) {
+	bc := bleControl(&response)
+	if bc == nil {
 		return
 	}
 
@@ -106,7 +109,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		apiResponse.Ctx = r.Context()
 
 		wg.Add(1)
-		control.BleControlInstance.PushCommand(command, vin, body, &apiResponse, autoWakeup)
+		bc.PushCommand(command, vin, body, &apiResponse, autoWakeup)
 
 		wg.Wait()
 
@@ -121,7 +124,7 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	control.BleControlInstance.PushCommand(command, vin, body, nil, autoWakeup)
+	bc.PushCommand(command, vin, body, nil, autoWakeup)
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }
@@ -161,7 +164,8 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	defer commonDefer(w, &response)
 
-	if !checkBleControl(&response) {
+	bc := bleControl(&response)
+	if bc == nil {
 		return
 	}
 
@@ -222,7 +226,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 
 	wg.Add(1)
 	autoWakeup := r.URL.Query().Get("wakeup") == "true"
-	control.BleControlInstance.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse, autoWakeup)
+	bc.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse, autoWakeup)
 
 	wg.Wait()
 
@@ -302,46 +306,50 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 
 	defer commonDefer(w, &response)
 
-	if !checkBleControl(&response) {
+	bc := bleControl(&response)
+	if bc == nil {
 		return
 	}
 
-	var apiResponse models.ApiResponse
-
+	// Through the queue like every other request, so it never opens a second BLE connection. If
+	// a connection to the car is already open, it is answered on it right away. It only needs
+	// VCSEC, so it does not wake the car.
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-	apiResponse.Ctx = ctx
 	defer cancel()
-	cmd := &commands.Command{
+	var apiResponse models.ApiResponse
+	wg := sync.WaitGroup{}
+	apiResponse.Wait = &wg
+	apiResponse.Ctx = ctx
+	wg.Add(1)
+	bc.Push(commands.Command{
 		Command:  "body-controller-state",
 		Domain:   commands.Domain.VCSEC,
 		Vin:      vin,
 		Response: &apiResponse,
+	})
+
+	// The loop answers once it reaches the command; do not wait past the timeout for that.
+	answered := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(answered)
+	}()
+	select {
+	case <-answered:
+	case <-ctx.Done():
+		response.Result = false
+		response.Reason = fmt.Sprintf("failed to get body controller state: %s", ctx.Err())
+		return
 	}
-	car, _, err := control.BleControlInstance.TryConnectToVehicle(ctx, cmd)
-	if err == nil {
-		//Successful
-		defer car.Disconnect()
 
-		_, err, _ := control.BleControlInstance.ExecuteCommand(car, cmd, context.Background())
-		if err != nil {
-			response.Result = false
-			response.Reason = err.Error()
-			return
-		}
-
+	if apiResponse.Result {
 		SetCacheControl(w, config.AppConfig.CacheMaxAge)
-
-		if apiResponse.Result {
-			response.Result = true
-			response.Reason = "The request was successfully processed."
-			response.Response = apiResponse.Response
-		} else {
-			response.Result = false
-			response.Reason = apiResponse.Error
-		}
+		response.Result = true
+		response.Reason = "The request was successfully processed."
+		response.Response = apiResponse.Response
 	} else {
 		response.Result = false
-		response.Reason = err.Error()
+		response.Reason = apiResponse.Error
 	}
 }
 

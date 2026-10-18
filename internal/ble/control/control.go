@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
@@ -19,21 +20,59 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
 
-var BleControlInstance *BleControl = nil
+// instance is the active BleControl. Handlers read it once per request with Instance(); the
+// dashboard swaps it when the active key changes.
+var (
+	instance atomic.Pointer[BleControl]
+	setupMu  sync.Mutex
+)
 
+// bleMu is held for as long as a BLE connection is open, and while the adapter is released.
+// The command loop, a loop being replaced after a key change, and SendKeysToVehicle each hold
+// it, so there is never more than one connection and the adapter is never closed under one.
+var bleMu sync.Mutex
+
+// Instance returns the active BleControl, or nil if no key is loaded.
+func Instance() *BleControl {
+	return instance.Load()
+}
+
+// Replace makes bc the active BleControl and returns the previous one. It neither starts nor
+// stops a loop; SetupBleControl and CloseBleControl do that.
+func Replace(bc *BleControl) *BleControl {
+	return instance.Swap(bc)
+}
+
+// SetupBleControl loads the active key, starts a new command loop and stops the previous one.
 func SetupBleControl() {
-	var err error
-	if BleControlInstance, err = NewBleControl(); err != nil {
+	setupMu.Lock()
+	defer setupMu.Unlock()
+
+	bc, err := NewBleControl()
+	if err != nil {
 		logging.Warn("BleControl could not be initialized!")
+		bc = nil
 	} else {
-		go BleControlInstance.Loop()
+		go bc.Loop()
 		logging.Info("BleControl initialized")
+	}
+	if previous := Replace(bc); previous != nil {
+		previous.Stop()
 	}
 }
 
+// CloseBleControl stops the active command loop.
 func CloseBleControl() {
-	BleControlInstance = nil
+	setupMu.Lock()
+	defer setupMu.Unlock()
+
+	if previous := Replace(nil); previous != nil {
+		previous.Stop()
+	}
 }
+
+// errStopped answers commands that reach a BleControl after it was replaced.
+var errStopped = errors.New("BLE control was restarted (active key changed), please retry")
 
 // Car is a connected vehicle: everything Send needs plus session handling.
 // *vehicle.Vehicle implements it; tests use internal/ble/fakecar.
@@ -65,8 +104,19 @@ type BleControl struct {
 	dial       Dialer
 	Timing     Timing
 
+	// ReleaseAdapterWhenIdle hands the BLE adapter back to the system (BlueZ) whenever no
+	// connection is open, so other Bluetooth services on the host can use it.
+	ReleaseAdapterWhenIdle bool
+	releaseAdapter         func() error
+
 	commandStack  chan commands.Command
 	providerStack chan commands.Command
+
+	// stopMu orders pushes against Stop: after Stop no command can enter the queue, so the
+	// loop can answer everything still queued and exit.
+	stopMu  sync.RWMutex
+	stopped bool
+	done    chan struct{}
 
 	// Cache to track when each vehicle was last confirmed awake
 	lastAwakeTime map[string]time.Time
@@ -87,19 +137,28 @@ func NewBleControl() (*BleControl, error) {
 	}
 	logging.Debug("PrivateKeyFile loaded", "PrivateKeyFile", privateKeyFile, "Role", GetActiveKeyRole())
 
-	return New(privateKey, nil), nil
+	bc := New(privateKey, nil)
+	if config.AppConfig != nil {
+		if config.AppConfig.ConnectionTimeout > 0 {
+			bc.Timing.ConnectionTimeout = time.Duration(config.AppConfig.ConnectionTimeout) * time.Second
+		}
+		bc.ReleaseAdapterWhenIdle = config.AppConfig.ReleaseAdapterWhenIdle
+	}
+	return bc, nil
 }
 
 // New returns a BleControl that connects through dial, or over BLE if dial is nil.
 // Without a private key only unauthenticated requests (add-key-request) are possible.
 func New(privateKey protocol.ECDHPrivateKey, dial Dialer) *BleControl {
 	bc := &BleControl{
-		privateKey:    privateKey,
-		dial:          dial,
-		Timing:        DefaultTiming,
-		commandStack:  make(chan commands.Command, 50),
-		providerStack: make(chan commands.Command),
-		lastAwakeTime: make(map[string]time.Time),
+		privateKey:     privateKey,
+		dial:           dial,
+		Timing:         DefaultTiming,
+		releaseAdapter: ble.CloseAdapter,
+		commandStack:   make(chan commands.Command, 50),
+		providerStack:  make(chan commands.Command),
+		done:           make(chan struct{}),
+		lastAwakeTime:  make(map[string]time.Time),
 	}
 	if bc.dial == nil {
 		bc.dial = bc.bleDial
@@ -109,15 +168,34 @@ func New(privateKey protocol.ECDHPrivateKey, dial Dialer) *BleControl {
 
 func (bc *BleControl) Loop() {
 	var retryCommand *commands.Command
+	defer func() {
+		if retryCommand != nil {
+			failCommand(retryCommand, errStopped)
+		}
+		bc.failQueued()
+		logging.Debug("Command loop stopped")
+	}()
 	for {
 		time.Sleep(bc.Timing.LoopDelay)
+		if bc.isStopped() {
+			return
+		}
 		if retryCommand != nil {
 			logging.Info("Retrying command", "Command", retryCommand.Command, "Body", retryCommand.Body)
 			retryCommand = bc.connectToVehicleAndOperateConnection(retryCommand)
 		} else {
+			if bc.ReleaseAdapterWhenIdle {
+				bleMu.Lock()
+				if err := bc.releaseAdapter(); err != nil {
+					logging.Debug("Failed to release BLE adapter", "error", err)
+				}
+				bleMu.Unlock()
+			}
 			logging.Debug("Waiting for next command ...")
 			// Wait for the next command
 			select {
+			case <-bc.done:
+				return
 			case command, ok := <-bc.providerStack:
 				if ok {
 					retryCommand = bc.connectToVehicleAndOperateConnection(&command)
@@ -131,14 +209,70 @@ func (bc *BleControl) Loop() {
 	}
 }
 
+// Stop ends the command loop. An open connection is closed, and commands that are queued or
+// pushed later are answered with an error instead of waiting forever.
+func (bc *BleControl) Stop() {
+	bc.stopMu.Lock()
+	defer bc.stopMu.Unlock()
+	if !bc.stopped {
+		bc.stopped = true
+		close(bc.done)
+	}
+}
+
+func (bc *BleControl) isStopped() bool {
+	select {
+	case <-bc.done:
+		return true
+	default:
+		return false
+	}
+}
+
+// failQueued answers every queued command with errStopped. Called by the loop after Stop, when
+// no further command can be pushed.
+func (bc *BleControl) failQueued() {
+	for {
+		select {
+		case command := <-bc.commandStack:
+			failCommand(&command, errStopped)
+		default:
+			return
+		}
+	}
+}
+
+// failCommand reports err to whoever waits for the command.
+func failCommand(command *commands.Command, err error) {
+	if command.Response == nil {
+		return
+	}
+	command.Response.Error = err.Error()
+	command.Response.Result = false
+	if command.Response.Wait != nil {
+		command.Response.Wait.Done()
+	}
+}
+
 func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse, autoWakeup bool) {
-	bc.commandStack <- commands.Command{
+	bc.Push(commands.Command{
 		Command:    command,
 		Vin:        vin,
 		Body:       body,
 		Response:   response,
 		AutoWakeup: autoWakeup,
+	})
+}
+
+// Push queues a command. After Stop it is answered with an error right away.
+func (bc *BleControl) Push(command commands.Command) {
+	bc.stopMu.RLock()
+	defer bc.stopMu.RUnlock()
+	if bc.stopped {
+		failCommand(&command, errStopped)
+		return
 	}
+	bc.commandStack <- command
 }
 
 // shouldCheckSleepStatus returns true if we need to check the vehicle's sleep status
@@ -164,6 +298,8 @@ func (bc *BleControl) markVehicleAwake(vin string) {
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
+	bleMu.Lock()
+	defer bleMu.Unlock()
 	logging.Info("Connecting to Vehicle ...")
 	//defer log.Debug("connecting to Vehicle done")
 
@@ -173,13 +309,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 
 	commandError := func(err error) *commands.Command {
 		logging.Error("Cannot connect to vehicle", "Error", err)
-		if firstCommand.Response != nil {
-			firstCommand.Response.Error = err.Error()
-			firstCommand.Response.Result = false
-			if firstCommand.Response.Wait != nil {
-				firstCommand.Response.Wait.Done()
-			}
-		}
+		failCommand(firstCommand, err)
 		return nil
 	}
 
@@ -474,6 +604,9 @@ func (bc *BleControl) operateConnection(car Car, firstCommand *commands.Command)
 		return cmd
 	}
 
+	// TryConnectToVehicle starts Infotainment only for commands that need it.
+	infotainment := needsInfotainment(firstCommand)
+
 	// If wake_up command executed successfully, upgrade session to include Infotainment
 	// for subsequent commands that might need it
 	if firstCommand.Command == "wake_up" {
@@ -487,6 +620,7 @@ func (bc *BleControl) operateConnection(car Car, firstCommand *commands.Command)
 			logging.Debug("Failed to upgrade session to Infotainment, subsequent commands may fail", "Error", err)
 		} else {
 			logging.Debug("Session upgraded to include Infotainment")
+			infotainment = true
 		}
 	}
 
@@ -494,6 +628,12 @@ func (bc *BleControl) operateConnection(car Car, firstCommand *commands.Command)
 		//If new VIN, close connection
 		if command.Vin != firstCommand.Vin {
 			logging.Debug("New VIN, closing connection ...")
+			return true, command
+		}
+		// A VCSEC-only connection (body-controller-state) cannot serve this command. Reconnect,
+		// which runs the wake-up and session logic for it.
+		if needsInfotainment(command) && !infotainment {
+			logging.Debug("Command needs Infotainment, reconnecting ...", "Command", command.Command)
 			return true, command
 		}
 
@@ -523,6 +663,9 @@ func (bc *BleControl) operateConnection(car Car, firstCommand *commands.Command)
 		case <-connectionCtx.Done():
 			logging.Debug("Connection timeout ...")
 			return nil
+		case <-bc.done:
+			logging.Debug("Command loop stopped, closing connection ...")
+			return nil
 		case command, ok := <-bc.providerStack:
 			if !ok {
 				return nil
@@ -543,6 +686,12 @@ func (bc *BleControl) operateConnection(car Car, firstCommand *commands.Command)
 			}
 		}
 	}
+}
+
+// needsInfotainment reports whether a command needs an Infotainment session. wake_up and
+// VCSEC commands (body-controller-state) work with VCSEC alone.
+func needsInfotainment(command *commands.Command) bool {
+	return command.Domain != commands.Domain.VCSEC && command.Command != "wake_up"
 }
 
 func (bc *BleControl) ExecuteCommand(car commands.Vehicle, command *commands.Command, connectionCtx context.Context) (retryCommand *commands.Command, retErr error, ctx context.Context) {
@@ -621,14 +770,11 @@ func (bc *BleControl) ExecuteCommand(car commands.Vehicle, command *commands.Com
 			if errors.As(err, &badInput) {
 				return nil, err, ctx
 			}
-			// A send that must not be repeated (rear trunk toggle) failed: tell the caller instead
-			// of reporting success. The returned command is nil, so it is never re-run.
-			var notRetried *commands.NotRetriedError
-			if errors.As(err, &notRetried) {
-				logging.Error("Failed, not retried", "Command", command.Command, "Body", command.Body, "Error", err)
-				return nil, err, ctx
-			}
-			return nil, nil, ctx
+			// Any other error that is not worth retrying (a toggle that must not be repeated, an
+			// unknown command, a missing key file) is reported, never turned into success. The
+			// returned command is nil, so it is not re-run.
+			logging.Error("Failed, not retried", "Command", command.Command, "Body", command.Body, "Error", err)
+			return nil, err, ctx
 		}
 
 		if strings.Contains(err.Error(), "closed pipe") {

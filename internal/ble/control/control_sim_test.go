@@ -49,6 +49,7 @@ func startControl(t *testing.T, connectionTimeout time.Duration, cars ...*fakeca
 	})
 	bc.Timing = Timing{LoopDelay: time.Millisecond, RetryDelay: time.Millisecond, ConnectionTimeout: connectionTimeout}
 	go bc.Loop()
+	t.Cleanup(bc.Stop)
 	return bc
 }
 

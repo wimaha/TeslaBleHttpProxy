@@ -23,7 +23,7 @@ import (
 )
 
 // End-to-end: HTTP request -> router -> handler -> command queue -> simulated car -> HTTP answer.
-// The handlers use the global control.BleControlInstance, so these tests do not run in parallel.
+// The handlers use the global control.Instance(), so these tests do not run in parallel.
 // Each test uses a fresh VIN because the vehicle_data cache is global as well.
 
 var vinCounter atomic.Int32
@@ -50,12 +50,12 @@ func startProxy(t *testing.T, vin string) *proxy {
 	bc.Timing = control.Timing{LoopDelay: time.Millisecond, RetryDelay: time.Millisecond, ConnectionTimeout: 200 * time.Millisecond}
 	go bc.Loop()
 
-	previous := control.BleControlInstance
-	control.BleControlInstance = bc
+	previous := control.Replace(bc)
 	server := httptest.NewServer(routes.SetupRoutes(fstest.MapFS{}, os.DirFS("../../.."), nil))
 	t.Cleanup(func() {
 		server.Close()
-		control.BleControlInstance = previous
+		control.Replace(previous)
+		bc.Stop()
 	})
 	return &proxy{t: t, car: car, server: server}
 }
@@ -134,6 +134,10 @@ func TestHTTPRejectsWithoutContactingCar(t *testing.T) {
 		{"/command/self_destruct?wait=true", "", "not supported"},
 		{"/command/set_temps?wait=true", `{"driver_temp": 40}`, "out of range"},
 		{"/command/actuate_trunk?wait=true", `{"which_trunk": "side"}`, "which_trunk"},
+		// used to come back as result=true without a body
+		{"/command/set_charging_amps?wait=true", "", "charging_amps missing"},
+		{"/command/set_charge_limit?wait=true", `{"percent": "eighty"}`, "percent parsing error"},
+		{"/command/set_sentry_mode?wait=true", `{}`, "on missing"},
 	} {
 		code, resp := p.do("POST", "/api/1/vehicles/"+vin+tc.path, tc.body)
 		wantStatus(t, code, resp, http.StatusServiceUnavailable)
@@ -242,8 +246,14 @@ func TestHTTPBodyControllerState(t *testing.T) {
 	if n := p.car.Count("Wakeup"); n != 0 {
 		t.Errorf("Wakeup count = %d, want 0: reading the body controller must not wake the car", n)
 	}
-	if n := p.car.Count("Disconnect"); n != 1 {
-		t.Errorf("Disconnect count = %d, want 1", n)
+	// It runs through the command queue, so the connection stays open for further commands and
+	// closes after the connection timeout like any other.
+	deadline := time.Now().Add(3 * time.Second)
+	for p.car.Count("Disconnect") != 1 {
+		if time.Now().After(deadline) {
+			t.Fatalf("Disconnect count = %d, want 1 after the connection timeout", p.car.Count("Disconnect"))
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 

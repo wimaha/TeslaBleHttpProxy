@@ -123,6 +123,19 @@ func RemoveKeyFiles() (error, error) {
 func SendKeysToVehicle(vin string, role string) error {
 	tempBleControl := New(nil, nil)
 
+	// Wait until the command loop has closed its connection, so there is only one at a time.
+	// The timeout starts after that.
+	bleMu.Lock()
+	defer bleMu.Unlock()
+	if config.AppConfig != nil && config.AppConfig.ReleaseAdapterWhenIdle {
+		// Deferred calls run last-in first-out: this runs after car.Disconnect, before Unlock.
+		defer func() {
+			if err := tempBleControl.releaseAdapter(); err != nil {
+				logging.Debug("Failed to release BLE adapter", "error", err)
+			}
+		}()
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	cmd := &commands.Command{
