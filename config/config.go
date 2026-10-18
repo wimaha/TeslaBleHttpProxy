@@ -89,9 +89,10 @@ var Version = "*undefined*"
 type Config struct {
 	LogLevel             string
 	HttpListenAddress    string
-	ScanTimeout          int // Seconds to scan for BLE devices
-	CacheMaxAge          int // Seconds for HTTP Cache-Control header max-age (used for body controller state responses). If set to 0, cache headers are disabled.
-	VehicleDataCacheTime int // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
+	ScanTimeout          int      // Seconds to scan for BLE devices
+	CacheMaxAge          int      // Seconds for HTTP Cache-Control header max-age (used for body controller state responses). If set to 0, cache headers are disabled.
+	VehicleDataCacheTime int      // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
+	TrustedOrigins       []string // Origins (scheme://host[:port]) allowed to send state-changing requests from a browser, e.g. a reverse proxy that rewrites the Host header.
 }
 
 var AppConfig *Config
@@ -145,12 +146,23 @@ func LoadConfig() *Config {
 	}
 	logging.Info("Env:", "vehicleDataCacheTime", vehicleDataCacheTimeInt)
 
+	var trustedOrigins []string
+	for _, origin := range strings.Split(os.Getenv("trustedOrigins"), ",") {
+		if origin = strings.TrimSpace(origin); origin != "" {
+			trustedOrigins = append(trustedOrigins, origin)
+		}
+	}
+	if len(trustedOrigins) > 0 {
+		logging.Info("Env:", "trustedOrigins", trustedOrigins)
+	}
+
 	return &Config{
 		LogLevel:             envLogLevel,
 		HttpListenAddress:    addr,
 		CacheMaxAge:          cacheMaxAgeInt,
 		ScanTimeout:          scanTimeoutInt,
 		VehicleDataCacheTime: vehicleDataCacheTimeInt,
+		TrustedOrigins:       trustedOrigins,
 	}
 }
 

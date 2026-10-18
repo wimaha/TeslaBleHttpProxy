@@ -11,8 +11,13 @@ import (
 
 func serve(t *testing.T, req *http.Request) int {
 	t.Helper()
+	return serveTrusting(t, req, nil)
+}
+
+func serveTrusting(t *testing.T, req *http.Request, trustedOrigins []string) int {
+	t.Helper()
 	rec := httptest.NewRecorder()
-	SetupRoutes(fstest.MapFS{}, fstest.MapFS{}).ServeHTTP(rec, req)
+	SetupRoutes(fstest.MapFS{}, fstest.MapFS{}, trustedOrigins).ServeHTTP(rec, req)
 	return rec.Code
 }
 
@@ -62,5 +67,28 @@ func TestKeyRoutesRejectGet(t *testing.T) {
 		if code := serve(t, httptest.NewRequest("GET", path, nil)); code != http.StatusMethodNotAllowed {
 			t.Errorf("GET %s: status = %d, want %d", path, code, http.StatusMethodNotAllowed)
 		}
+	}
+}
+
+// Behind a plain-HTTP reverse proxy that rewrites Host, browsers send no Sec-Fetch-Site and the
+// Origin no longer matches Host. Dashboard forms then need the proxy's origin to be trusted.
+func TestReverseProxyOriginNeedsTrust(t *testing.T) {
+	request := func() *http.Request {
+		form := url.Values{"role": {"invalid"}}.Encode()
+		req := httptest.NewRequest("POST", "http://127.0.0.1:8080/activate_key", strings.NewReader(form))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", "http://nas.local")
+		return req
+	}
+
+	if code := serveTrusting(t, request(), nil); code != http.StatusForbidden {
+		t.Errorf("untrusted: status = %d, want %d", code, http.StatusForbidden)
+	}
+	if code := serveTrusting(t, request(), []string{"http://nas.local"}); code != http.StatusSeeOther {
+		t.Errorf("trusted: status = %d, want %d", code, http.StatusSeeOther)
+	}
+	// An invalid entry is logged and skipped instead of breaking startup.
+	if code := serveTrusting(t, request(), []string{"nas.local/path", "http://nas.local"}); code != http.StatusSeeOther {
+		t.Errorf("with invalid entry: status = %d, want %d", code, http.StatusSeeOther)
 	}
 }

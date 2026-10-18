@@ -52,7 +52,7 @@ func startProxy(t *testing.T, vin string) *proxy {
 
 	previous := control.BleControlInstance
 	control.BleControlInstance = bc
-	server := httptest.NewServer(routes.SetupRoutes(fstest.MapFS{}, os.DirFS("../../..")))
+	server := httptest.NewServer(routes.SetupRoutes(fstest.MapFS{}, os.DirFS("../../.."), nil))
 	t.Cleanup(func() {
 		server.Close()
 		control.BleControlInstance = previous

@@ -284,3 +284,9 @@ Due to BLE's power-saving design, Tesla vehicles may terminate connections after
 **Fix:** Close the Tesla app on mobile phones when not needed, especially if you're also wearing a smartwatch with the Tesla app. The proxy counts as one device, so limit other active BLE connections accordingly.
 
 This is a Tesla vehicle constraint, not a limitation of TeslaBleHttpProxy.
+
+### Dashboard buttons return 403 Forbidden
+
+The proxy rejects state-changing requests that a browser sends from another website, so a page you visit cannot change your keys or send commands to the car. If you open the dashboard through a reverse proxy over plain HTTP that rewrites the `Host` header, your own requests can look cross-site too. Set the [`trustedOrigins`](docs/environment_variables.md#trustedorigins) environment variable to the address you open in the browser, e.g. `trustedOrigins=http://nas.local:8080`. Over HTTPS this is not needed.
+
+The key management endpoints `/gen_keys` and `/remove_keys` accept `POST` only. Scripts that called them with `GET`, as older versions allowed, must switch to `POST`.

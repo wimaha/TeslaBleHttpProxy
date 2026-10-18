@@ -22,6 +22,10 @@ This is the number of seconds to cache VehicleData endpoint responses in memory.
 
 This is the address and port to listen for HTTP requests. (Default: :8080)
 
+## trustedOrigins
+
+Comma-separated list of origins (`scheme://host[:port]`) that may send state-changing requests (dashboard buttons, commands) from a browser. Only needed if the dashboard is reached through a reverse proxy over plain HTTP that rewrites the `Host` header (nginx does this by default). In that case the dashboard buttons answer `403 Forbidden`. Set this to the address you type in the browser, e.g. `http://nas.local:8080`. Requests from evcc, curl or Home Assistant integrations are not affected. (Default: empty)
+
 # Example
 
 ## Docker compose

@@ -44,7 +44,7 @@ func main() {
 		)
 	}
 
-	router := routes.SetupRoutes(static, html)
+	router := routes.SetupRoutes(static, html, config.AppConfig.TrustedOrigins)
 
 	logging.Info("TeslaBleHttpProxy is running!")
 	if err := http.ListenAndServe(config.AppConfig.HttpListenAddress, router); err != nil {

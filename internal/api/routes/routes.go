@@ -6,12 +6,14 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/handlers"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 )
 
 // SetupRoutes returns the router wrapped in cross-origin protection: state-changing requests a
 // browser sends from another site are rejected, while clients that send neither Origin nor
-// Sec-Fetch-Site (evcc, curl, Home Assistant) pass unchanged.
-func SetupRoutes(static fs.FS, html fs.FS) http.Handler {
+// Sec-Fetch-Site (evcc, curl, Home Assistant) pass unchanged. trustedOrigins are exempt, for a
+// reverse proxy that rewrites the Host header on plain HTTP, where browsers send no Sec-Fetch-Site.
+func SetupRoutes(static fs.FS, html fs.FS, trustedOrigins []string) http.Handler {
 	router := mux.NewRouter()
 
 	// Define the endpoints
@@ -30,5 +32,11 @@ func SetupRoutes(static fs.FS, html fs.FS) http.Handler {
 	router.HandleFunc("/send_key", handlers.SendKey).Methods("POST")
 	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
 
-	return http.NewCrossOriginProtection().Handler(router)
+	protection := http.NewCrossOriginProtection()
+	for _, origin := range trustedOrigins {
+		if err := protection.AddTrustedOrigin(origin); err != nil {
+			logging.Error("Ignoring invalid trusted origin", "origin", origin, "error", err)
+		}
+	}
+	return protection.Handler(router)
 }
