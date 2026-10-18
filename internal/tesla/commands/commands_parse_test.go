@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/teslamotors/vehicle-command/pkg/vehicle"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/fakecar"
 )
 
 func TestParseTemps(t *testing.T) {
@@ -96,12 +96,16 @@ func TestValidateBody(t *testing.T) {
 func TestInvalidBodyNotRetried(t *testing.T) {
 	for _, cmd := range []string{"set_temps", "actuate_trunk"} {
 		command := &Command{Command: cmd, Body: map[string]interface{}{}}
-		retry, err := command.Send(context.Background(), &vehicle.Vehicle{})
+		car := fakecar.New(testVin)
+		retry, err := command.Send(context.Background(), car)
 		if err == nil {
 			t.Errorf("%s with empty body: expected error", cmd)
 		}
 		if retry {
 			t.Errorf("%s with empty body: shouldRetry = true, want false", cmd)
+		}
+		if len(car.Calls()) != 0 {
+			t.Errorf("%s with empty body: car got %v, want no call", cmd, car.Methods())
 		}
 	}
 }

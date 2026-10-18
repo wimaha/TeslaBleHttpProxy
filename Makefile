@@ -19,6 +19,9 @@ default:: build
 lint::
 	golangci-lint run
 
+test::
+	go test -race ./...
+
 build::
 	@echo Version: $(VERSION) $(SHA) $(BUILD_DATE)
 	go build $(BUILD_ARGS)
