@@ -26,7 +26,7 @@
                     {{if $key.Exists}}
                         {{if $key.IsActive}}
                             <span class="active-badge">● Active</span>
-                            <form action="/remove_keys" method="GET" style="display: inline; margin-left: 8px;">
+                            <form action="/remove_keys" method="POST" style="display: inline; margin-left: 8px;">
                                 <input type="hidden" name="role" value="{{$key.Role}}" />
                                 <button type="submit" class="remove-button small-button" onclick="return confirmRemoveKey('{{$key.DisplayName}}');">Remove</button>
                             </form>
@@ -35,14 +35,14 @@
                                 <input type="hidden" name="role" value="{{$key.Role}}" />
                                 <button type="submit" class="save-button small-button">Activate</button>
                             </form>
-                            <form action="/remove_keys" method="GET" style="display: inline; margin-left: 8px;">
+                            <form action="/remove_keys" method="POST" style="display: inline; margin-left: 8px;">
                                 <input type="hidden" name="role" value="{{$key.Role}}" />
                                 <button type="submit" class="remove-button small-button" onclick="return confirmRemoveKey('{{$key.DisplayName}}');">Remove</button>
                             </form>
                         {{end}}
                     {{else}}
                         <span class="not-generated">Not generated</span>
-                        <form action="/gen_keys" method="GET" style="display: inline; margin-left: 12px;">
+                        <form action="/gen_keys" method="POST" style="display: inline; margin-left: 12px;">
                             <input type="hidden" name="role" value="{{$key.Role}}" />
                             <button type="submit" class="add-button small-button">Generate</button>
                         </form>

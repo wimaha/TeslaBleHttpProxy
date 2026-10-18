@@ -22,6 +22,17 @@ This is the number of seconds to cache VehicleData endpoint responses in memory.
 
 This is the address and port to listen for HTTP requests. (Default: :8080)
 
+## trustedOrigins
+
+Comma-separated list of origins (`scheme://host[:port]`) that may send state-changing requests (dashboard buttons, commands) from a browser. Requests from evcc, curl or Home Assistant integrations are not affected. (Default: empty)
+
+You need it in two cases, because the proxy otherwise answers `403 Forbidden`:
+
+- The dashboard is reached through a reverse proxy over plain HTTP that rewrites the `Host` header (nginx does this by default). Set it to the address you type in the browser, e.g. `http://nas.local:8080`.
+- A custom web page or browser tool on another origin calls the API with `POST`, e.g. a page served from `http://homeserver:3000`. Set it to that page's origin.
+
+Case, a trailing slash and the default ports `:80`/`:443` do not matter. Several origins: `trustedOrigins=http://nas.local:8080,https://home.example.com`.
+
 # Example
 
 ## Docker compose

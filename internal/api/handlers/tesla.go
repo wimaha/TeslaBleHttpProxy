@@ -42,7 +42,7 @@ func commonDefer(w http.ResponseWriter, response *models.Response) {
 	}
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(ret); err != nil {
-		logging.Fatal("failed to send response", "error", err)
+		logging.Error("failed to send response", "error", err)
 	}
 	logging.Debug("Response", "Command", response.Command, "Status", status, "Result", response.Result, "Reason", response.Reason)
 }
