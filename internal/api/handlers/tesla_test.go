@@ -126,6 +126,23 @@ func TestHTTPCommandWithoutWait(t *testing.T) {
 	}
 }
 
+// A command without wait=true that cannot even be queued must not be reported as accepted.
+func TestHTTPCommandWithoutWaitReportsRejection(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	control.Instance().Stop() // as during a key change
+
+	code, resp := p.do("POST", "/api/1/vehicles/"+vin+"/command/flash_lights", "")
+
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+	if resp.Result || !strings.Contains(resp.Reason, "restarted") {
+		t.Errorf("response = %+v, want the rejection", resp)
+	}
+	if n := len(p.car.Calls()); n != 0 {
+		t.Errorf("car got %v, want no contact", p.car.Methods())
+	}
+}
+
 func TestHTTPRejectsWithoutContactingCar(t *testing.T) {
 	vin := newVin()
 	p := startProxy(t, vin)

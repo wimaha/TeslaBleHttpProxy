@@ -299,6 +299,25 @@ func TestNonRetriedErrorIsReported(t *testing.T) {
 	wait.Wait()
 }
 
+// After a key change while the car is out of range, the old loop must not keep Bluetooth busy
+// with its connection attempts (SendKeysToVehicle would wait for it).
+func TestStopEndsConnectionAttempt(t *testing.T) {
+	bc := newControl(t, time.Second) // no car: every dial fails and is retried
+	bc.Timing.RetryDelay = time.Minute
+	go bc.Loop()
+
+	resp, answered := pushWait(bc, commands.Command{Command: "flash_lights", Vin: vin1})
+	time.Sleep(20 * time.Millisecond) // first attempt failed, now waiting to retry
+	bc.Stop()
+
+	waitAnswered(t, "command during connection attempt", answered)
+	mustFail(t, resp, "restarted")
+	if !lockBLE(time.Second) {
+		t.Fatal("bleMu still held after Stop")
+	}
+	bleMu.Unlock()
+}
+
 // A full queue answers at once instead of blocking the caller, so Stop is never held up.
 func TestFullQueueRejectsAndStopDoesNotHang(t *testing.T) {
 	bc := newControl(t, time.Second, fakecar.New(vin1)) // loop not started: nothing drains the queue
@@ -308,6 +327,10 @@ func TestFullQueueRejectsAndStopDoesNotHang(t *testing.T) {
 	resp, answered := pushWait(bc, commands.Command{Command: "flash_lights", Vin: vin1})
 	waitAnswered(t, "push into a full queue", answered)
 	mustFail(t, resp, "queue is full")
+	// Without a response (no wait=true) the caller learns it from the returned error.
+	if err := bc.Push(commands.Command{Command: "flash_lights", Vin: vin1}); !errors.Is(err, errQueueFull) {
+		t.Errorf("Push into a full queue = %v, want errQueueFull", err)
+	}
 
 	stopped := make(chan struct{})
 	go func() { bc.Stop(); close(stopped) }()

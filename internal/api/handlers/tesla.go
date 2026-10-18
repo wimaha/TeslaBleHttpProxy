@@ -124,7 +124,12 @@ func Command(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bc.PushCommand(command, vin, body, nil, autoWakeup)
+	// Nobody waits for the outcome, but a command that was not even queued must not look accepted.
+	if err := bc.PushCommand(command, vin, body, nil, autoWakeup); err != nil {
+		response.Result = false
+		response.Reason = err.Error()
+		return
+	}
 	response.Result = true
 	response.Reason = "The command was successfully received and will be processed shortly."
 }

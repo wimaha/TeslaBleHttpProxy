@@ -7,6 +7,7 @@ All notable changes are listed here. `Unreleased` is what `main` and the Docker 
 ### Breaking
 
 - `/gen_keys` and `/remove_keys` accept `POST` only. `GET` now returns `405`. The dashboard already uses `POST`; scripts or bookmarks that call these endpoints with `GET` must switch. ([#170](https://github.com/wimaha/TeslaBleHttpProxy/pull/170))
+- Possibly breaking for integrations: requests that fail are now always reported as failures (`result: false`, HTTP 503). Before, some of them, for example `set_charging_amps` without a body, returned `result: true` without doing anything. Commands sent without `wait=true` that cannot be queued (queue full, key change) now return 503 instead of "will be processed shortly". `body_controller_state` waits in the command queue and answers with an error after 15 seconds if the proxy is busy, for example retrying while the car is out of range. ([#174](https://github.com/wimaha/TeslaBleHttpProxy/pull/174))
 
 ### Security
 

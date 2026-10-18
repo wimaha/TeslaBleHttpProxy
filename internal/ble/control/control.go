@@ -252,6 +252,8 @@ func (bc *BleControl) failQueued() {
 // failCommand reports err to whoever waits for the command.
 func failCommand(command *commands.Command, err error) {
 	if command.Response == nil {
+		// Sent without wait=true: nobody is waiting, so at least say that it was not executed.
+		logging.Warn("Command not executed", "Command", command.Command, "Vin", command.Vin, "Error", err)
 		return
 	}
 	command.Response.Error = err.Error()
@@ -261,8 +263,9 @@ func failCommand(command *commands.Command, err error) {
 	}
 }
 
-func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse, autoWakeup bool) {
-	bc.Push(commands.Command{
+// PushCommand queues a command; see Push for the returned error.
+func (bc *BleControl) PushCommand(command string, vin string, body map[string]interface{}, response *models.ApiResponse, autoWakeup bool) error {
+	return bc.Push(commands.Command{
 		Command:    command,
 		Vin:        vin,
 		Body:       body,
@@ -271,21 +274,23 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 	})
 }
 
-// Push queues a command. After Stop, or if the queue is full, it is answered with an error
-// right away. It never blocks, so Stop cannot be held up by a waiting push.
-func (bc *BleControl) Push(command commands.Command) {
+// Push queues a command. After Stop, or if the queue is full, the command is rejected: the
+// error is returned and also reported to command.Response, if any. Push never blocks, so Stop
+// cannot be held up by a waiting push.
+func (bc *BleControl) Push(command commands.Command) error {
 	bc.stopMu.RLock()
 	defer bc.stopMu.RUnlock()
-	if bc.stopped {
-		failCommand(&command, errStopped)
-		return
+	err := errStopped
+	if !bc.stopped {
+		select {
+		case bc.commandStack <- command:
+			return nil
+		default:
+			err = errQueueFull
+		}
 	}
-	select {
-	case bc.commandStack <- command:
-	default:
-		logging.Error("Command queue is full, rejecting command", "Command", command.Command)
-		failCommand(&command, errQueueFull)
-	}
+	failCommand(&command, err)
+	return err
 }
 
 // RequestClose asks the loop to close its connection once the current command is done, instead
@@ -331,6 +336,9 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 	var lastErr error
 
 	commandError := func(err error) *commands.Command {
+		if bc.isStopped() {
+			err = errStopped
+		}
 		logging.Error("Cannot connect to vehicle", "Error", err)
 		failCommand(firstCommand, err)
 		return nil
@@ -348,6 +356,18 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 		}
 		parentCtx = context.Background()
 	}
+
+	// Stop also ends a connection attempt (scan, retries), so after a key change the old loop
+	// frees Bluetooth at once even while the car is out of range.
+	parentCtx, cancelParent := context.WithCancel(parentCtx)
+	defer cancelParent()
+	go func() {
+		select {
+		case <-bc.done:
+			cancelParent()
+		case <-parentCtx.Done():
+		}
+	}()
 
 	for i := 0; i < retryCount; i++ {
 		if i > 0 {
