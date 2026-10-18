@@ -3,18 +3,28 @@ name: Dev
 env:
   GO_VERSION: ^1.25
 
+# :dev is always the current state of main. The ruleset "Required checks" lets a change reach
+# main only with Build, Lint and Test passing (admins can bypass), so every push is published.
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
+
+# A newer push replaces a build still running, so an older commit never overwrites :dev.
+concurrency:
+  group: docker-dev
+  cancel-in-progress: true
 
 jobs:
   docker:
     name: Publish Docker :dev
+    # also for a manual run: never publish another branch as :dev
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: dev
 
       - name: Login
         uses: docker/login-action@v3
