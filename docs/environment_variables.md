@@ -1,5 +1,7 @@
 # Environment variables
 
+> **Note:** This page describes the current development state (`main`, Docker `:dev`). Sections marked *(unreleased)* are not in the latest release yet, see the [CHANGELOG](../CHANGELOG.md).
+
 You can optionally set environment variables to override the default behavior.
 
 ## logLevel
@@ -23,6 +25,8 @@ This is the number of seconds to cache VehicleData endpoint responses in memory.
 This is the address and port to listen for HTTP requests. (Default: :8080)
 
 ## trustedOrigins
+
+*(unreleased)*
 
 Comma-separated list of origins (`scheme://host[:port]`) that may send state-changing requests (dashboard buttons, commands) from a browser. Requests from evcc, curl or Home Assistant integrations are not affected. (Default: empty)
 

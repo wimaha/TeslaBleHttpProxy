@@ -10,8 +10,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  docs:
+    name: Check docs for release
+    # A manual run on a branch has no version to check against.
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check README, docs and CHANGELOG
+        run: ./scripts/check-release-docs.sh "${{ github.ref_name }}"
+
   docker:
     name: Publish Docker :release
+    needs: docs
+    # Publish only if the docs check passed, or did not run (manual run on a branch).
+    if: ${{ !cancelled() && (needs.docs.result == 'success' || needs.docs.result == 'skipped') }}
     runs-on: ubuntu-latest
 
     steps:
