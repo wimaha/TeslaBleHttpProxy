@@ -74,6 +74,10 @@ func CloseBleControl() {
 // errStopped answers commands that reach a BleControl after it was replaced.
 var errStopped = errors.New("BLE control was restarted (active key changed), please retry")
 
+// errQueueFull answers commands while the queue is full, which means the car has been
+// unreachable for a while and requests piled up.
+var errQueueFull = errors.New("command queue is full, the vehicle is not reachable at the moment")
+
 // Car is a connected vehicle: everything Send needs plus session handling.
 // *vehicle.Vehicle implements it; tests use internal/ble/fakecar.
 type Car interface {
@@ -118,6 +122,8 @@ type BleControl struct {
 	stopped bool
 	done    chan struct{}
 
+	closeRequest chan struct{} // see RequestClose
+
 	// Cache to track when each vehicle was last confirmed awake
 	lastAwakeTime map[string]time.Time
 	awakeTimeMu   sync.RWMutex
@@ -158,6 +164,7 @@ func New(privateKey protocol.ECDHPrivateKey, dial Dialer) *BleControl {
 		commandStack:   make(chan commands.Command, 50),
 		providerStack:  make(chan commands.Command),
 		done:           make(chan struct{}),
+		closeRequest:   make(chan struct{}, 1),
 		lastAwakeTime:  make(map[string]time.Time),
 	}
 	if bc.dial == nil {
@@ -264,7 +271,8 @@ func (bc *BleControl) PushCommand(command string, vin string, body map[string]in
 	})
 }
 
-// Push queues a command. After Stop it is answered with an error right away.
+// Push queues a command. After Stop, or if the queue is full, it is answered with an error
+// right away. It never blocks, so Stop cannot be held up by a waiting push.
 func (bc *BleControl) Push(command commands.Command) {
 	bc.stopMu.RLock()
 	defer bc.stopMu.RUnlock()
@@ -272,7 +280,22 @@ func (bc *BleControl) Push(command commands.Command) {
 		failCommand(&command, errStopped)
 		return
 	}
-	bc.commandStack <- command
+	select {
+	case bc.commandStack <- command:
+	default:
+		logging.Error("Command queue is full, rejecting command", "Command", command.Command)
+		failCommand(&command, errQueueFull)
+	}
+}
+
+// RequestClose asks the loop to close its connection once the current command is done, instead
+// of keeping it open for the connection timeout. Used before opening a connection outside the
+// loop (SendKeysToVehicle).
+func (bc *BleControl) RequestClose() {
+	select {
+	case bc.closeRequest <- struct{}{}:
+	default: // already requested
+	}
 }
 
 // shouldCheckSleepStatus returns true if we need to check the vehicle's sleep status
@@ -665,6 +688,9 @@ func (bc *BleControl) operateConnection(car Car, firstCommand *commands.Command)
 			return nil
 		case <-bc.done:
 			logging.Debug("Command loop stopped, closing connection ...")
+			return nil
+		case <-bc.closeRequest:
+			logging.Debug("Connection needed elsewhere, closing connection ...")
 			return nil
 		case command, ok := <-bc.providerStack:
 			if !ok {

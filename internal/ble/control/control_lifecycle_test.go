@@ -298,3 +298,74 @@ func TestNonRetriedErrorIsReported(t *testing.T) {
 	}
 	wait.Wait()
 }
+
+// A full queue answers at once instead of blocking the caller, so Stop is never held up.
+func TestFullQueueRejectsAndStopDoesNotHang(t *testing.T) {
+	bc := newControl(t, time.Second, fakecar.New(vin1)) // loop not started: nothing drains the queue
+	for i := 0; i < cap(bc.commandStack); i++ {
+		bc.Push(commands.Command{Command: "flash_lights", Vin: vin1})
+	}
+	resp, answered := pushWait(bc, commands.Command{Command: "flash_lights", Vin: vin1})
+	waitAnswered(t, "push into a full queue", answered)
+	mustFail(t, resp, "queue is full")
+
+	stopped := make(chan struct{})
+	go func() { bc.Stop(); close(stopped) }()
+	select {
+	case <-stopped:
+	case <-time.After(time.Second):
+		t.Fatal("Stop blocked with a full queue")
+	}
+}
+
+// A caller that gave up (body_controller_state after 15 s) does not reach the car later.
+func TestCanceledRequestDoesNotReachCar(t *testing.T) {
+	car := fakecar.New(vin1)
+	bc := newControl(t, time.Second, car)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	resp := &models.ApiResponse{Wait: wg, Ctx: ctx}
+	command := bodyControllerState(vin1)
+	command.Response = resp
+	bc.Push(command)
+	go bc.Loop()
+
+	answered := make(chan struct{})
+	go func() { wg.Wait(); close(answered) }()
+	waitAnswered(t, "canceled body-controller-state", answered)
+	mustFail(t, resp, "canceled")
+	if n := len(car.Calls()); n != 0 {
+		t.Errorf("car got %v, want no contact", car.Methods())
+	}
+}
+
+// RequestClose ends an idle connection right away instead of after the connection timeout.
+func TestRequestCloseEndsIdleConnection(t *testing.T) {
+	car := fakecar.New(vin1)
+	bc := newControl(t, time.Minute, car)
+	go bc.Loop()
+	resp, answered := pushWait(bc, commands.Command{Command: "flash_lights", Vin: vin1})
+	waitAnswered(t, "flash_lights", answered)
+	mustSucceed(t, resp)
+
+	bc.RequestClose()
+	eventually(t, "connection closed on request", func() bool { return car.Count("Disconnect") == 1 })
+	if !lockBLE(time.Second) {
+		t.Fatal("bleMu still held after the connection closed")
+	}
+	bleMu.Unlock()
+}
+
+func TestLockBLEGivesUp(t *testing.T) {
+	bleMu.Lock()
+	defer bleMu.Unlock()
+	start := time.Now()
+	if lockBLE(100 * time.Millisecond) {
+		t.Fatal("lockBLE succeeded while bleMu was held")
+	}
+	if d := time.Since(start); d > time.Second {
+		t.Errorf("lockBLE took %s, want about 100ms", d)
+	}
+}

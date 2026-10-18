@@ -239,6 +239,10 @@ This is recommended if you want to receive data frequently, since it will reduce
 
 The body controller state is fetched from the vehicle and returnes the state of the body controller. The request does not wake up the vehicle. The following information is returned:
 
+*(unreleased)*
+
+The request goes through the same queue as commands, so there is only ever one Bluetooth connection to the vehicle. If a connection is already open, it is answered on it right away. If the proxy is busy with another command (for example retrying while the vehicle is out of range), the request waits for at most 15 seconds and then answers with an error.
+
 - `vehicleLockState`
   - `VEHICLELOCKSTATE_UNLOCKED`
   - `VEHICLELOCKSTATE_LOCKED`

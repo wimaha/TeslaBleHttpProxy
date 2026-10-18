@@ -120,13 +120,40 @@ func RemoveKeyFiles() (error, error) {
 	return err1, err2
 }
 
+// sendKeyWait is how long SendKeysToVehicle waits for the command loop to free the connection.
+var sendKeyWait = 30 * time.Second
+
+// lockBLE takes bleMu, giving up after timeout.
+func lockBLE(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for !bleMu.TryLock() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return true
+}
+
 func SendKeysToVehicle(vin string, role string) error {
 	tempBleControl := New(nil, nil)
 
-	// Wait until the command loop has closed its connection, so there is only one at a time.
-	// The timeout starts after that.
-	bleMu.Lock()
+	// Only one connection at a time: ask the command loop to close its connection and wait for
+	// it, but not forever. The 15 s for the request start after that.
+	if bc := Instance(); bc != nil {
+		bc.RequestClose()
+	}
+	if !lockBLE(sendKeyWait) {
+		return fmt.Errorf("Bluetooth is busy with another connection to the vehicle, please try again in a moment")
+	}
 	defer bleMu.Unlock()
+	if bc := Instance(); bc != nil {
+		// Drop a close request the loop did not need, so it does not end its next connection early.
+		select {
+		case <-bc.closeRequest:
+		default:
+		}
+	}
 	if config.AppConfig != nil && config.AppConfig.ReleaseAdapterWhenIdle {
 		// Deferred calls run last-in first-out: this runs after car.Disconnect, before Unlock.
 		defer func() {
