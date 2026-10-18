@@ -1,20 +1,13 @@
 package logging
 
-var storageInstance *LogStorage
-
 // InitLogHandler initializes the log storage system
 // With the wrapper approach, logs are captured directly via CaptureLog in wrapper functions
 func InitLogHandler() {
-	storageInstance = GetStorage()
+	GetStorage()
 }
 
 // CaptureLog manually captures a log entry (for use in wrapper functions)
 func CaptureLog(level, msg string, args ...interface{}) {
-	if storageInstance == nil {
-		// Ensure storage is initialized
-		storageInstance = GetStorage()
-	}
-
 	fields := make(map[string]interface{})
 
 	// Parse key-value pairs from args
@@ -37,5 +30,6 @@ func CaptureLog(level, msg string, args ...interface{}) {
 		}
 	}
 
-	storageInstance.AddEntry(level, msg, fields)
+	// GetStorage initializes once and is safe to call from concurrent handlers.
+	GetStorage().AddEntry(level, msg, fields)
 }
