@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"fmt"
+	"html/template"
 	"io"
 	"io/fs"
 	"net/http"
-	"text/template"
 
 	"github.com/wimaha/TeslaBleHttpProxy/config"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
@@ -66,8 +66,8 @@ func ShowDashboard(html fs.FS) http.HandlerFunc {
 }
 
 func GenKeys(w http.ResponseWriter, r *http.Request) {
-	// Get role from query parameter
-	role := r.URL.Query().Get("role")
+	// Get role from the form body
+	role := r.FormValue("role")
 	if role == "" {
 		role = control.KeyRoleChargingManager // Default to charging_manager (recommended for security)
 	}
@@ -113,8 +113,8 @@ func GenKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func RemoveKeys(w http.ResponseWriter, r *http.Request) {
-	// Get role from query parameter
-	role := r.URL.Query().Get("role")
+	// Get role from the form body
+	role := r.FormValue("role")
 
 	// Role is required (legacy keys are automatically migrated)
 	if role == "" {

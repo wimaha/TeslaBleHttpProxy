@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"html/template"
 	"io/fs"
 	"net/http"
 	"strconv"
-	"text/template"
 	"time"
 
 	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"

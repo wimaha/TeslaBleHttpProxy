@@ -1,5 +1,7 @@
 package models
 
+import "sync"
+
 type MessageType int
 
 // Declare related constants for each weekday starting with index 1
@@ -25,41 +27,50 @@ type Message struct {
 	Type    MessageType
 }
 
-type MessageStack []Message
+// MessageStack is safe for concurrent use; HTTP handlers push and pop in parallel.
+type MessageStack struct {
+	mu       sync.Mutex
+	messages []Message
+}
 
 // IsEmpty: check if stack is empty
 func (s *MessageStack) IsEmpty() bool {
-	return len(*s) == 0
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.messages) == 0
 }
 
 // Push a new value onto the stack
 func (s *MessageStack) Push(str Message) {
-	*s = append(*s, str) // Simply append the new value to the end of the stack
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messages = append(s.messages, str) // Simply append the new value to the end of the stack
 }
 
 // Prepend to Stack
 func (s *MessageStack) Prepend(str Message) {
-	*s = append([]Message{str}, *s...)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.messages = append([]Message{str}, s.messages...)
 }
 
 // Remove and return top element of stack. Return true if stack is empty.
 func (s *MessageStack) Pop() (Message, bool) {
-	if s.IsEmpty() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.messages) == 0 {
 		return Message{}, true
-	} else {
-		index := 0             // Get the index of the top most element.
-		element := (*s)[index] // Index into the slice and obtain the element.
-		*s = (*s)[index+1:]    // Remove it from the stack by slicing it off.
-		return element, false
 	}
+	element := s.messages[0]
+	s.messages = s.messages[1:]
+	return element, false
 }
 
 func (s *MessageStack) PopAll() []Message {
-	var all []Message
-	for _, message := range *s {
-		all = append(all, message)
-	}
-	*s = (*s)[:0]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	all := s.messages
+	s.messages = nil
 	return all
 }
 

@@ -1,14 +1,17 @@
 package routes
 
 import (
-	"embed"
+	"io/fs"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/handlers"
 )
 
-func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
+// SetupRoutes returns the router wrapped in cross-origin protection: state-changing requests a
+// browser sends from another site are rejected, while clients that send neither Origin nor
+// Sec-Fetch-Site (evcc, curl, Home Assistant) pass unchanged.
+func SetupRoutes(static fs.FS, html fs.FS) http.Handler {
 	router := mux.NewRouter()
 
 	// Define the endpoints
@@ -21,11 +24,11 @@ func SetupRoutes(static embed.FS, html embed.FS) *mux.Router {
 	router.HandleFunc("/logs", handlers.ShowLogViewer(html)).Methods("GET")
 	router.HandleFunc("/api/logs", handlers.GetLogs).Methods("GET")
 	router.HandleFunc("/api/logs/stats", handlers.GetLogStats).Methods("GET")
-	router.HandleFunc("/gen_keys", handlers.GenKeys).Methods("GET")
-	router.HandleFunc("/remove_keys", handlers.RemoveKeys).Methods("GET")
+	router.HandleFunc("/gen_keys", handlers.GenKeys).Methods("POST")
+	router.HandleFunc("/remove_keys", handlers.RemoveKeys).Methods("POST")
 	router.HandleFunc("/activate_key", handlers.ActivateKey).Methods("POST")
 	router.HandleFunc("/send_key", handlers.SendKey).Methods("POST")
 	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(static)))
 
-	return router
+	return http.NewCrossOriginProtection().Handler(router)
 }
