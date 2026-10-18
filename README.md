@@ -287,6 +287,12 @@ Due to BLE's power-saving design, Tesla vehicles may terminate connections after
 
 This is a Tesla vehicle constraint, not a limitation of TeslaBleHttpProxy.
 
+### Sharing the Bluetooth adapter with other services
+
+*(unreleased)*
+
+By default the proxy keeps the Bluetooth adapter for itself while it runs, so other Bluetooth services on the same host (for example a door lock using BlueZ) report "No Bluetooth adapters found". Set [`releaseAdapterWhenIdle=true`](docs/environment_variables.md#releaseadapterwhenidle) to hand the adapter back whenever no connection to the car is open, and a lower [`connectionTimeout`](docs/environment_variables.md#connectiontimeout) such as `10` to free it sooner after a command.
+
 ### Dashboard buttons return 403 Forbidden
 
 *(unreleased)*
