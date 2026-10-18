@@ -72,8 +72,8 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu7U=
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
-github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268 h1:36sDJ2qts2oT/Fy/Wi6MR15C+LHl2+ZUzLp6UaqhS9c=
-github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268/go.mod h1:fFJl/jD/uyILGBeD5iQ8tYHrPlJafyqCJzAyTHNJ1Uk=
+github.com/wimaha/ble_BleConnectFix v0.0.0-20261018210806-b933489a83fc h1:jevReITmxQ1l/Q8S7s9yP/YTiae2gyP5B3Pyg59x9QQ=
+github.com/wimaha/ble_BleConnectFix v0.0.0-20261018210806-b933489a83fc/go.mod h1:fFJl/jD/uyILGBeD5iQ8tYHrPlJafyqCJzAyTHNJ1Uk=
 github.com/wimaha/vehicle-command v0.0.8 h1:hFjih8U2OTI9sKrPEx3A0cKSCq/bN5pVVMeM9RSvhWw=
 github.com/wimaha/vehicle-command v0.0.8/go.mod h1:liN6VG6MCc7m02wFaBm2sQT6MYGm/dJua6bG00QSpnA=
 github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=

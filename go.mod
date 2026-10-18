@@ -39,4 +39,4 @@ require (
 
 replace github.com/teslamotors/vehicle-command => github.com/wimaha/vehicle-command v0.0.8
 
-replace github.com/go-ble/ble => github.com/wimaha/ble_BleConnectFix v0.0.0-20240822192426-3f74826c1268
+replace github.com/go-ble/ble => github.com/wimaha/ble_BleConnectFix v0.0.0-20261018210806-b933489a83fc

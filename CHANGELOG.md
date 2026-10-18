@@ -34,6 +34,7 @@ All notable changes are listed here. `Unreleased` is what `main` and the Docker 
 - Errors are reported more strictly: requests that failed without being retried (for example a missing body) now return `result: false` (HTTP 503), where some used to return `result: true`.
 - When the command queue is full (50 waiting requests, the vehicle has been unreachable for a while), new requests are answered with an error right away instead of waiting.
 - Sending a key to the vehicle from the dashboard closes an idle connection of the command loop first and waits at most 30 seconds for a busy one.
+- Updated BLE library ([wimaha/ble_BleConnectFix#1](https://github.com/wimaha/ble_BleConnectFix/pull/1)): when the proxy closes the adapter, it is brought back up, so BlueZ sees it again. Needed for `releaseAdapterWhenIdle`.
 - Building from source requires Go 1.26 or newer. ([#172](https://github.com/wimaha/TeslaBleHttpProxy/pull/172))
 - Tests run against a simulated vehicle, so commands, connection handling and the HTTP API are covered without a car. ([#169](https://github.com/wimaha/TeslaBleHttpProxy/pull/169))
 
