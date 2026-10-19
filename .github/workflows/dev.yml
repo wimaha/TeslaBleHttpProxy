@@ -1,7 +1,7 @@
 name: Dev
 
 env:
-  GO_VERSION: ^1.26
+  GO_VERSION: ^1.27
 
 # :dev is always the current state of main. The ruleset "Required checks" lets a change reach
 # main only with Build, Lint and Test passing (admins can bypass), so every push is published.
