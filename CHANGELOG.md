@@ -18,6 +18,7 @@ All notable changes are listed here. `Unreleased` is what `main` and the Docker 
 
 - `trustedOrigins` environment variable for reverse proxies over plain HTTP that rewrite the `Host` header, and for web pages on other origins that call the API. See [environment variables](docs/environment_variables.md#trustedorigins). ([#170](https://github.com/wimaha/TeslaBleHttpProxy/pull/170))
 - Docker image `:dev`, built from `main` on every push. ([#171](https://github.com/wimaha/TeslaBleHttpProxy/pull/171))
+- Docker image `:pr-<number>` for every pull request from a branch of this repository, to test a change on a car before it is merged. See [Test images for pull requests](README.md#test-images-for-pull-requests).
 - `releaseAdapterWhenIdle` environment variable: hands the Bluetooth adapter back to the system between connections, so other Bluetooth services on the same host can use it. Off by default. Fixes [#158](https://github.com/wimaha/TeslaBleHttpProxy/issues/158), based on [#161](https://github.com/wimaha/TeslaBleHttpProxy/pull/161) by @AloisKlingler.
 - `connectionTimeout` environment variable: how long a connection stays open after a command (default 29 seconds as before). Based on [#161](https://github.com/wimaha/TeslaBleHttpProxy/pull/161) by @AloisKlingler.
 - README examples for `set_charge_limit` and `set_sentry_mode`. ([#169](https://github.com/wimaha/TeslaBleHttpProxy/pull/169))
