@@ -54,7 +54,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
 
   cleanup:
-    name: Delete Docker :pr-${{ github.event.pull_request.number }}
+    # A fixed name: GitHub shows the expression unexpanded while the job is skipped.
+    name: Delete Docker PR image
     if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
 
@@ -68,8 +69,13 @@ jobs:
           TAG: pr-${{ github.event.pull_request.number }}
         run: |
           token=$(jq -n --arg u "$DOCKER_USER" --arg p "$DOCKER_PASS" '{username: $u, password: $p}' |
-            curl -sf -H 'Content-Type: application/json' -d @- https://hub.docker.com/v2/users/login |
-            jq -r .token)
+            curl -s -H 'Content-Type: application/json' -d @- https://hub.docker.com/v2/users/login |
+            jq -r '.token // empty') || true
+          if [ -z "$token" ]; then
+            echo "Docker Hub login failed, delete :$TAG by hand"
+            exit 1
+          fi
+          echo "::add-mask::$token"
           status=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $token" \
             "https://hub.docker.com/v2/repositories/wimaha/tesla-ble-http-proxy/tags/$TAG/")
           case "$status" in
