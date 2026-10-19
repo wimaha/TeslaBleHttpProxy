@@ -1,6 +1,6 @@
 # TeslaBleHttpProxy
 
-> **Note:** This README describes the current development state (`main`, Docker `:dev`). For the latest release **2.4.0** (Docker `:latest`) see the [README of 2.4.0](https://github.com/wimaha/TeslaBleHttpProxy/blob/2.4.0/README.md). What changed since then is listed in the [CHANGELOG](CHANGELOG.md). Sections marked *(unreleased)* are only in `:dev`.
+> **Note:** This README describes the current development state (`main`, Docker `:dev`). For the latest release **2.5.0** (Docker `:latest`) see the [README of 2.5.0](https://github.com/wimaha/TeslaBleHttpProxy/blob/2.5.0/README.md). What changed since then is listed in the [CHANGELOG](CHANGELOG.md). Sections marked *(unreleased)* are only in `:dev`.
 
 TeslaBleHttpProxy is a program written in Go that receives HTTP requests and forwards them via Bluetooth to a Tesla vehicle. The program can, for example, be easily used together with [evcc](https://github.com/evcc-io/evcc).
 
@@ -244,7 +244,7 @@ This is recommended if you want to receive data frequently, since it will reduce
 
 The body controller state is fetched from the vehicle and returnes the state of the body controller. The request does not wake up the vehicle. The following information is returned:
 
-*(unreleased)*
+*(since 2.5.0)*
 
 The request goes through the same queue as commands, so there is only ever one Bluetooth connection to the vehicle. If a connection is already open, it is answered on it right away. If the proxy is busy with another command (for example retrying while the vehicle is out of range), the request waits for at most 15 seconds and then answers with an error.
 
@@ -278,7 +278,7 @@ The response will contain the version of the proxy.
 
 ### Status of Proxy and Vehicles
 
-*(unreleased)*
+*(since 2.5.0)*
 
 The dashboard (`http://localhost:8080/dashboard`) shows the status of the proxy and of each vehicle it has talked to: connection, sleep state, battery and charging, climate, lock state, and the last successful contact and last error. Every block shows when its data was fetched. Opening or auto-updating the dashboard never contacts the vehicle; it only shows what the proxy already knows, for example from evcc polling `vehicle_data`. **Refresh** fetches current data without waking the vehicle; **Wake & refresh** wakes it first (after a confirmation).
 
@@ -312,13 +312,13 @@ This is a Tesla vehicle constraint, not a limitation of TeslaBleHttpProxy.
 
 ### Sharing the Bluetooth adapter with other services
 
-*(unreleased)*
+*(since 2.5.0)*
 
 By default the proxy keeps the Bluetooth adapter for itself while it runs, so other Bluetooth services on the same host (for example a door lock using BlueZ) report "No Bluetooth adapters found". Set [`releaseAdapterWhenIdle=true`](docs/environment_variables.md#releaseadapterwhenidle) to hand the adapter back whenever no connection to the car is open, and a lower [`connectionTimeout`](docs/environment_variables.md#connectiontimeout) such as `10` to free it sooner after a command.
 
 ### Dashboard buttons return 403 Forbidden
 
-*(unreleased)*
+*(since 2.5.0)*
 
 The proxy rejects state-changing requests that a browser sends from another website, so a page you visit cannot change your keys or send commands to the car. If you open the dashboard through a reverse proxy over plain HTTP that rewrites the `Host` header, your own requests can look cross-site too. Set the [`trustedOrigins`](docs/environment_variables.md#trustedorigins) environment variable to the address you open in the browser, e.g. `trustedOrigins=http://nas.local:8080`. Over HTTPS this is not needed.
 
