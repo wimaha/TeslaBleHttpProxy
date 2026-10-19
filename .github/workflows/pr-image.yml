@@ -1,0 +1,79 @@
+name: PR image
+
+# Publishes :pr-<number> for every pull request from a branch of this repository, so a change
+# can be tested on a real car with `docker pull` before it is merged. Pull requests from forks
+# get no secrets and are skipped. :latest, :dev and version tags are never touched.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+# A newer push to the same pull request replaces a build still running.
+concurrency:
+  group: docker-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docker:
+    name: Publish Docker :pr-${{ github.event.pull_request.number }}
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    steps:
+      # The head commit of the branch, not the merge commit with main, so the image is exactly
+      # what was pushed.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASS }}
+
+      - name: Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: wimaha/tesla-ble-http-proxy
+          tags: |
+            type=raw,value=pr-${{ github.event.pull_request.number }}
+
+      - name: Publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64,linux/arm/v6,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+  cleanup:
+    name: Delete Docker :pr-${{ github.event.pull_request.number }}
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+
+    steps:
+      # Needs a Docker Hub access token with "Read, Write, Delete" scope in DOCKER_PASS. If this
+      # step fails, delete the tag by hand on Docker Hub.
+      - name: Delete tag
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+          TAG: pr-${{ github.event.pull_request.number }}
+        run: |
+          token=$(jq -n --arg u "$DOCKER_USER" --arg p "$DOCKER_PASS" '{username: $u, password: $p}' |
+            curl -sf -H 'Content-Type: application/json' -d @- https://hub.docker.com/v2/users/login |
+            jq -r .token)
+          status=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $token" \
+            "https://hub.docker.com/v2/repositories/wimaha/tesla-ble-http-proxy/tags/$TAG/")
+          case "$status" in
+            204) echo "Deleted :$TAG" ;;
+            404) echo ":$TAG does not exist, nothing to delete" ;;
+            *) echo "Deleting :$TAG failed with HTTP $status"; exit 1 ;;
+          esac

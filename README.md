@@ -65,6 +65,10 @@ Please remember to create an empty folder called `key` where the keys can be sto
 
 Note that you can optionally set environment variables to override the default behavior. See [environment variables](docs/environment_variables.md) for more information.
 
+#### Test images for pull requests
+
+Every pull request from a branch of this repository gets its own Docker image `wimaha/tesla-ble-http-proxy:pr-<number>` (for all platforms of the release image), rebuilt on every push to the pull request. To test a change on your car before it is merged, set `image: wimaha/tesla-ble-http-proxy:pr-<number>` in your `docker-compose.yml` and run `docker compose pull && docker compose up -d`. Pull requests from forks get no image. When the pull request is closed, the tag is deleted again.
+
 ## Generate key for vehicle
 
 *(Here, the simple, automatic method is described. Besides the automatic method, you can also generate the keys [manually](docs/manually_gen_key.md).)*
