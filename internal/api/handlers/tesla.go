@@ -236,7 +236,6 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 // than cacheTime, the rest over BLE, which is then cached. If the BLE request fails, it falls
 // back to what is cached. wakeup wakes the car if it is asleep.
 func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, endpoints []string, cacheTime time.Duration, wakeup bool, response *models.Response) {
-
 	// Check cache for each endpoint
 	vehicleDataCacheMux.RLock()
 	cachedData := make(map[string]json.RawMessage) // endpoint -> cached data

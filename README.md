@@ -288,6 +288,8 @@ The same information as JSON, without contacting the vehicle:
 To fetch current `charge_state` and `climate_state` for the dashboard (bypasses the cache, the result is cached like any `vehicle_data` response):
 `POST http://localhost:8080/api/proxy/1/status/refresh` with form fields `vin` and `wakeup` (`true` wakes the vehicle if it is asleep, default `false`).
 
+**No login:** like the rest of the API, the dashboard and these endpoints have no authentication. Anyone who can reach the proxy on your network can see the VIN, battery, charging and climate data, and can wake the vehicle or send commands. Only websites opened in a browser are blocked from doing this (see [Dashboard buttons return 403 Forbidden](#dashboard-buttons-return-403-forbidden)). Run the proxy only in a network you trust, and do not expose its port to the internet; if you need remote access, put it behind a VPN or a reverse proxy with authentication.
+
 ## Troubleshooting
 
 ### Vehicle Requirements
