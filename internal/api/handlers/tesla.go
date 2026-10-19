@@ -31,6 +31,60 @@ var (
 	vehicleDataCacheMux sync.RWMutex
 )
 
+// bodyControllerCache keeps the last successful body_controller_state per VIN for the dashboard.
+// It is never used to answer body_controller_state itself.
+var (
+	bodyControllerCache    = make(map[string]*vehicleDataCacheEntry)
+	bodyControllerCacheMux sync.RWMutex
+)
+
+// cachedEntry is a cached response and when it was fetched.
+type cachedEntry struct {
+	Data      json.RawMessage `json:"data"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// latestVehicleData returns the last cached data of an endpoint, however old, or nil.
+func latestVehicleData(vin, endpoint string) *cachedEntry {
+	vehicleDataCacheMux.RLock()
+	defer vehicleDataCacheMux.RUnlock()
+	if e, ok := vehicleDataCache[generateVehicleDataCacheKey(vin, endpoint)]; ok {
+		return &cachedEntry{Data: e.data, UpdatedAt: e.timestamp}
+	}
+	return nil
+}
+
+// latestBodyControllerState returns the last successful body_controller_state, or nil.
+func latestBodyControllerState(vin string) *cachedEntry {
+	bodyControllerCacheMux.RLock()
+	defer bodyControllerCacheMux.RUnlock()
+	if e, ok := bodyControllerCache[vin]; ok {
+		return &cachedEntry{Data: e.data, UpdatedAt: e.timestamp}
+	}
+	return nil
+}
+
+// cachedVins returns every VIN with cached vehicle data or body controller state.
+func cachedVins() []string {
+	seen := map[string]bool{}
+	vehicleDataCacheMux.RLock()
+	for key := range vehicleDataCache {
+		vin, _, _ := strings.Cut(key, ":")
+		seen[vin] = true
+	}
+	vehicleDataCacheMux.RUnlock()
+	bodyControllerCacheMux.RLock()
+	for vin := range bodyControllerCache {
+		seen[vin] = true
+	}
+	bodyControllerCacheMux.RUnlock()
+	vins := make([]string, 0, len(seen))
+	for vin := range seen {
+		vins = append(vins, vin)
+	}
+	return vins
+}
+
 func commonDefer(w http.ResponseWriter, response *models.Response) {
 	var ret models.Ret
 	ret.Response = *response
@@ -175,6 +229,13 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheTime := time.Duration(config.AppConfig.VehicleDataCacheTime) * time.Second
+	fetchVehicleData(r.Context(), bc, vin, endpoints, cacheTime, r.URL.Query().Get("wakeup") == "true", &response)
+}
+
+// fetchVehicleData fills response with the endpoints: from the cache where an entry is younger
+// than cacheTime, the rest over BLE, which is then cached. If the BLE request fails, it falls
+// back to what is cached. wakeup wakes the car if it is asleep.
+func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, endpoints []string, cacheTime time.Duration, wakeup bool, response *models.Response) {
 
 	// Check cache for each endpoint
 	vehicleDataCacheMux.RLock()
@@ -227,11 +288,10 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	var apiResponse models.ApiResponse
 	wg := sync.WaitGroup{}
 	apiResponse.Wait = &wg
-	apiResponse.Ctx = r.Context()
+	apiResponse.Ctx = ctx
 
 	wg.Add(1)
-	autoWakeup := r.URL.Query().Get("wakeup") == "true"
-	bc.PushCommand(command, vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse, autoWakeup)
+	bc.PushCommand("vehicle_data", vin, map[string]interface{}{"endpoints": endpoints}, &apiResponse, wakeup)
 
 	wg.Wait()
 
@@ -348,6 +408,9 @@ func BodyControllerState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if apiResponse.Result {
+		bodyControllerCacheMux.Lock()
+		bodyControllerCache[vin] = &vehicleDataCacheEntry{data: apiResponse.Response, timestamp: time.Now()}
+		bodyControllerCacheMux.Unlock()
 		SetCacheControl(w, config.AppConfig.CacheMaxAge)
 		response.Result = true
 		response.Reason = "The request was successfully processed."
