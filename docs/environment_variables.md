@@ -26,7 +26,7 @@ This is the address and port to listen for HTTP requests. (Default: :8080)
 
 ## trustedOrigins
 
-*(unreleased)*
+*(since 2.5.0)*
 
 Comma-separated list of origins (`scheme://host[:port]`) that may send state-changing requests (dashboard buttons, commands) from a browser. Requests from evcc, curl or Home Assistant integrations are not affected. (Default: empty)
 
@@ -39,13 +39,13 @@ Case, a trailing slash and the default ports `:80`/`:443` do not matter. Several
 
 ## connectionTimeout
 
-*(unreleased)*
+*(since 2.5.0)*
 
 The number of seconds a Bluetooth connection to the vehicle stays open after a command, so that further commands (for example from evcc) are sent without connecting again. A lower value frees the Bluetooth adapter sooner, which matters with `releaseAdapterWhenIdle`; a higher value means fewer reconnects. (Default: 29)
 
 ## releaseAdapterWhenIdle
 
-*(unreleased)*
+*(since 2.5.0)*
 
 If `true`, the proxy hands the Bluetooth adapter back to the system (BlueZ) whenever no connection to the vehicle is open, so other Bluetooth services on the same host can use it, for example a door lock. By default the proxy keeps the adapter for itself until it stops. With this option every new connection sets up the adapter again, which takes a little longer. Combine it with a lower `connectionTimeout` (for example `10`) to free the adapter sooner after a command. (Default: false)
 
