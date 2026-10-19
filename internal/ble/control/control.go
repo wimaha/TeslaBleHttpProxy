@@ -124,6 +124,9 @@ type BleControl struct {
 
 	closeRequest chan struct{} // see RequestClose
 
+	// What the loop knows about each vehicle, for the dashboard
+	status statusTracker
+
 	// Cache to track when each vehicle was last confirmed awake
 	lastAwakeTime map[string]time.Time
 	awakeTimeMu   sync.RWMutex
@@ -323,6 +326,7 @@ func (bc *BleControl) markVehicleAwake(vin string) {
 	bc.awakeTimeMu.Lock()
 	bc.lastAwakeTime[vin] = time.Now()
 	bc.awakeTimeMu.Unlock()
+	bc.status.sleepStatus(vin, SleepStatusAwake)
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
@@ -340,6 +344,7 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 			err = errStopped
 		}
 		logging.Error("Cannot connect to vehicle", "Error", err)
+		bc.status.failed(firstCommand.Vin, firstCommand.Command, err)
 		failCommand(firstCommand, err)
 		return nil
 	}
@@ -386,6 +391,8 @@ func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *command
 		if err == nil {
 			//Successful - cancel the connection attempt context since we're done with it
 			cancel()
+			bc.status.connected(firstCommand.Vin, true)
+			defer bc.status.connected(firstCommand.Vin, false) // runs after Disconnect
 			defer car.Disconnect()
 			cmd := bc.operateConnection(car, firstCommand)
 			return cmd
@@ -570,6 +577,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 						} else {
 							sleepStatus := vs.GetVehicleSleepStatus().String()
 							if strings.Contains(sleepStatus, "ASLEEP") {
+								bc.status.sleepStatus(firstCommand.Vin, SleepStatusAsleep)
 								logging.Debug("Vehicle is asleep")
 								if firstCommand.AutoWakeup {
 									logging.Debug("Waking up vehicle as requested ...")
@@ -758,6 +766,12 @@ func (bc *BleControl) ExecuteCommand(car commands.Vehicle, command *commands.Com
 	var lastErr error
 
 	defer func() {
+		// Record the final outcome; a command handed back for a retry is not final yet.
+		if retErr == nil {
+			bc.status.succeeded(command.Vin, command.Command)
+		} else if retryCommand == nil {
+			bc.status.failed(command.Vin, command.Command, retErr)
+		}
 		if command.Response != nil {
 			if retErr != nil {
 				command.Response.Error = retErr.Error()
