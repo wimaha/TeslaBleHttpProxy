@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -390,5 +391,43 @@ func TestLockBLEGivesUp(t *testing.T) {
 	}
 	if d := time.Since(start); d > time.Second {
 		t.Errorf("lockBLE took %s, want about 100ms", d)
+	}
+}
+
+func vehicleConnection(bc *BleControl, vin string) VehicleConnection {
+	for _, v := range bc.Vehicles() {
+		if v.Vin == vin {
+			return v
+		}
+	}
+	return VehicleConnection{}
+}
+
+// The dashboard's view of a connection follows the loop: connected while open, the outcome of
+// each command, and errors.
+func TestVehiclesTracksConnection(t *testing.T) {
+	car := fakecar.New(vin1)
+	// A long timeout keeps the connection open until RequestClose, however slow the machine.
+	bc := newControl(t, time.Minute, car)
+	go bc.Loop()
+
+	resp, answered := pushWait(bc, commands.Command{Command: "flash_lights", Vin: vin1})
+	waitAnswered(t, "flash_lights", answered)
+	mustSucceed(t, resp)
+	v := vehicleConnection(bc, vin1)
+	if !v.Connected || v.ConnectedSince.IsZero() {
+		t.Errorf("while connected: %+v", v)
+	}
+	if v.LastSuccess == nil || v.LastSuccess.Command != "flash_lights" {
+		t.Errorf("last_success = %+v", v.LastSuccess)
+	}
+	bc.RequestClose()
+	eventually(t, "disconnected after RequestClose", func() bool { return !vehicleConnection(bc, vin1).Connected })
+
+	resp, answered = pushWait(bc, commands.Command{Command: "flash_lights", Vin: vin2})
+	waitAnswered(t, "unreachable car", answered)
+	mustFail(t, resp, "not in range")
+	if e := vehicleConnection(bc, vin2).LastError; e == nil || e.Command != "flash_lights" || !strings.Contains(e.Message, "not in range") {
+		t.Errorf("last_error = %+v", e)
 	}
 }

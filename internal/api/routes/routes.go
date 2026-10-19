@@ -24,6 +24,8 @@ func SetupRoutes(static fs.FS, html fs.FS, trustedOrigins []string) http.Handler
 	router.HandleFunc("/api/1/vehicles/{vin}/vehicle_data", handlers.VehicleData).Methods("GET")
 	router.HandleFunc("/api/1/vehicles/{vin}/body_controller_state", handlers.BodyControllerState).Methods("GET")
 	router.HandleFunc("/api/proxy/1/version", handlers.Version).Methods("GET")
+	router.HandleFunc("/api/proxy/1/status", handlers.Status).Methods("GET")
+	router.HandleFunc("/api/proxy/1/status/refresh", handlers.RefreshStatus).Methods("POST")
 	router.HandleFunc("/dashboard", handlers.ShowDashboard(html)).Methods("GET")
 	router.HandleFunc("/logs", handlers.ShowLogViewer(html)).Methods("GET")
 	router.HandleFunc("/api/logs", handlers.GetLogs).Methods("GET")
