@@ -667,3 +667,293 @@ input:checked + .slider:before {
         width: 100% !important;
     }
 }
+
+/* Vehicle status (static/js/status.js) */
+.status-proxy {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 12px;
+}
+
+.status-ok {
+    color: #28a745;
+}
+
+.status-bad {
+    color: #d32f2f;
+}
+
+.status-card {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+
+.status-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.status-vin {
+    font-family: monospace;
+    font-size: 15px;
+    font-weight: 600;
+    user-select: all;
+}
+
+.status-badge {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.badge-since {
+    font-weight: normal;
+    color: #888;
+    font-size: 12px;
+}
+
+.badge-connected {
+    color: #28a745;
+}
+
+.badge-awake {
+    color: #1976d2;
+}
+
+.badge-asleep {
+    color: #7b5ea7;
+}
+
+.badge-unknown {
+    color: #999;
+}
+
+.status-actions {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 4px;
+}
+
+.status-button {
+    background-color: #1976d2;
+    color: #fff;
+    border: 1px solid #1976d2;
+    cursor: pointer;
+}
+
+.status-button:hover:not(:disabled) {
+    background-color: #1565c0;
+}
+
+.status-button-secondary {
+    background-color: transparent;
+    color: #1976d2;
+}
+
+.status-button-secondary:hover:not(:disabled) {
+    background-color: #e3f2fd;
+}
+
+.status-actions button:disabled,
+.status-vin-form button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.status-note {
+    font-size: 13px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    margin-top: 8px;
+}
+
+.note-ok {
+    background-color: #e8f5e9;
+    color: #1b5e20;
+}
+
+.note-info {
+    background-color: #e3f2fd;
+    color: #0d47a1;
+}
+
+.note-error {
+    background-color: #ffebee;
+    color: #b71c1c;
+}
+
+.status-block {
+    border-top: 1px solid #eee;
+    margin-top: 12px;
+    padding-top: 12px;
+}
+
+.status-block h4 {
+    margin-bottom: 6px;
+}
+
+.status-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+    padding: 3px 0;
+}
+
+.status-label {
+    color: #666;
+}
+
+.status-value {
+    font-weight: 600;
+    text-align: right;
+}
+
+.status-history .status-value {
+    font-weight: normal;
+    font-size: 13px;
+}
+
+.status-error-text {
+    color: #b71c1c;
+    font-size: 12px;
+    word-break: break-word;
+}
+
+.status-empty {
+    font-size: 13px;
+    color: #999;
+}
+
+.status-freshness {
+    font-size: 12px;
+    color: #888;
+    margin-top: 6px;
+}
+
+.status-stale {
+    color: #b26a00;
+}
+
+.soc-bar {
+    position: relative;
+    height: 10px;
+    border-radius: 5px;
+    background-color: #e0e0e0;
+    margin: 4px 0 8px;
+    overflow: visible;
+}
+
+.soc-fill {
+    height: 100%;
+    border-radius: 5px;
+    background-color: #4caf50;
+}
+
+.soc-limit {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: 16px;
+    background-color: #333;
+}
+
+.status-vin-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.status-vin-form input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px;
+    font-family: monospace;
+    text-transform: uppercase;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .status-proxy,
+    .status-label,
+    .status-freshness,
+    .badge-since {
+        color: #aaa;
+    }
+
+    .status-card {
+        border-color: #444;
+    }
+
+    .status-block {
+        border-top-color: #333;
+    }
+
+    .soc-bar {
+        background-color: #333;
+    }
+
+    .soc-limit {
+        background-color: #eee;
+    }
+
+    .status-stale {
+        color: #ffb74d;
+    }
+
+    .status-error-text {
+        color: #ef9a9a;
+    }
+
+    .note-ok {
+        background-color: #1b3a1b;
+        color: #a5d6a7;
+    }
+
+    .note-info {
+        background-color: #0d2a4a;
+        color: #90caf9;
+    }
+
+    .note-error {
+        background-color: #4a1a1a;
+        color: #ffcdd2;
+    }
+
+    .badge-awake {
+        color: #64b5f6;
+    }
+
+    .badge-asleep {
+        color: #b39ddb;
+    }
+
+    .status-button-secondary {
+        color: #90caf9;
+        border-color: #90caf9;
+    }
+
+    .status-button-secondary:hover:not(:disabled) {
+        background-color: #0d2a4a;
+    }
+
+    .status-vin-form input {
+        background-color: #111;
+        color: #fff;
+        border-color: #555;
+    }
+}
+
+@media (max-width: 768px) {
+    .status-actions button {
+        flex: 1;
+    }
+}

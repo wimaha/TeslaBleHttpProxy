@@ -13,6 +13,11 @@
             <a href="/logs" style="color: #007bff; text-decoration: none; font-size: 14px;">View Logs</a>
         </div>
     </div>
+    <h3>Vehicle Status</h3>
+    <p class="description-text">Shows what the proxy already knows; updating this page never contacts the vehicle. <strong>Refresh</strong> fetches current data without waking the vehicle.</p>
+    <div id="vehicle-status" aria-live="polite"></div>
+</div>
+<div class="container">
     <div class="add-setting">
         <h3>Key Management</h3>
         <p class="description-text">You can generate multiple keys with different roles. The active key is used for all vehicle operations.</p>
@@ -120,4 +125,5 @@ function confirmRemoveKey(displayName) {
     return confirm(message);
 }
 </script>
+<script src="static/js/status.js"></script>
 {{end}}
