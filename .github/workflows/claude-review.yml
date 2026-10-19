@@ -87,7 +87,15 @@ jobs:
 
             Secondary: real bugs and security issues. Skip pure style nitpicks.
 
-            Output: post ONE top-level comment with `gh pr comment <number> --body ...`.
+            Output, in this order:
+            1. Inline comments FIRST: for each of the (at most 3) most important
+               to-dos that point to a changed line in the diff, call
+               `mcp__github_inline_comment__create_inline_comment` with
+               `confirmed: true`, the file path and the line number in the new
+               version of the file. One or two sentences each: what is wrong and
+               how to fix it. Skip this step only if no to-do points to a changed
+               line.
+            2. Then post ONE top-level comment with `gh pr comment <number> --body ...`.
 
             Write it for a busy maintainer and a contributor who may not be a native
             English speaker: short sentences, plain English, explain effects in terms
@@ -134,10 +142,6 @@ jobs:
             Choose ✅ only if there is no compatibility risk and no to-do; 🟡 if only
             small, low-risk to-dos remain; ❌ for breaking changes, unresolved
             compatibility risks or real bugs.
-
-            Inline comments: use `mcp__github_inline_comment__create_inline_comment`
-            (with `confirmed: true`) only for the at most 3 most important problems,
-            each in one or two sentences.
 
             Be concrete. If unsure, say so instead of guessing. Only post GitHub
             comments; don't submit review text as messages.
