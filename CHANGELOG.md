@@ -16,6 +16,7 @@ All notable changes are listed here. `Unreleased` is what `main` and the Docker 
 
 ### Added
 
+- Vehicle status on the dashboard: connection and sleep state, battery and charging, climate, lock state, last contact and last error per vehicle, each with the time its data is from. It updates itself every 10 seconds from what the proxy already knows and never contacts the vehicle on its own; **Refresh** fetches current data without waking it, **Wake & refresh** wakes it first. New endpoints `GET /api/proxy/1/status` and `POST /api/proxy/1/status/refresh`. ([#168](https://github.com/wimaha/TeslaBleHttpProxy/issues/168))
 - `trustedOrigins` environment variable for reverse proxies over plain HTTP that rewrite the `Host` header, and for web pages on other origins that call the API. See [environment variables](docs/environment_variables.md#trustedorigins). ([#170](https://github.com/wimaha/TeslaBleHttpProxy/pull/170))
 - Docker image `:dev`, built from `main` on every push. ([#171](https://github.com/wimaha/TeslaBleHttpProxy/pull/171))
 - Docker image `:pr-<number>` for every pull request from a branch of this repository, to test a change on a car before it is merged. See [Test images for pull requests](README.md#test-images-for-pull-requests).
