@@ -20,6 +20,18 @@ This is the number of seconds for the HTTP Cache-Control header `max-age` value.
 
 This is the number of seconds to cache VehicleData endpoint responses in memory. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN, allowing efficient serving of frequently requested vehicle data without establishing a BLE connection. If a request is made within the cache time, the cached response is returned immediately. If set to 0, in-memory caching is disabled. (Default: 30)
 
+## serveStaleWhenAsleep
+
+*(unreleased)*
+
+By default a `vehicle_data` request for a sleeping car whose cache has expired (see `vehicleDataCacheTime`) is answered with HTTP 503 "vehicle is sleeping". If `true`, the proxy answers with the last cached values instead, however old, as long as every requested endpoint has been cached at least once. The car is never woken by this. The answer is marked so clients can tell: `"stale": true` and `"cache_age_seconds"` (age of the oldest value) next to `result`, and the `reason` says that the data is old. The values themselves also carry their own `timestamp`. If an endpoint was never cached, the request still fails with 503. Only the "vehicle is sleeping" case is affected; other errors, for example a car out of range, are reported as before. Useful for clients such as evcc that treat every 503 as a change of state. (Default: false)
+
+## wakeWhenNotCached
+
+*(unreleased)*
+
+By default the car is only woken when the request has `wakeup=true`. If `true`, a `vehicle_data` request that includes an endpoint that has never been cached since the proxy started wakes the car, so the cache gets filled once. Later requests for that endpoint no longer wake it, even when the entry has expired. If the wake-up or the read fails, the next request tries again. Combine with `serveStaleWhenAsleep` to keep serving those values while the car sleeps. Note that this option wakes the car without the client asking for it. (Default: false)
+
 ## httpListenAddress
 
 This is the address and port to listen for HTTP requests. (Default: :8080)

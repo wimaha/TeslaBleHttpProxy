@@ -286,9 +286,10 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 	}
 
 	// Some endpoints missing/expired - fetch from BLE
-	// An endpoint that was never cached has nothing to fall back on, so wake the car to fill the
-	// cache. Once cached, later requests (even expired ones) no longer wake it.
-	if neverCached && !wakeup {
+	// Opt-in (wakeWhenNotCached): an endpoint that was never cached has nothing to serve while the
+	// car sleeps, so wake it once to fill the cache. Without the option the car is only woken when
+	// the client asks with wakeup=true.
+	if neverCached && !wakeup && config.AppConfig.WakeWhenNotCached {
 		logging.Debug("VehicleData endpoint never cached, waking the vehicle once to fill the cache", "VIN", vin)
 		wakeup = true
 	}
@@ -344,30 +345,36 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 		response.Reason = "The request was successfully processed."
 		response.Response = responseJson
 	} else {
-		// The car is asleep: answer from the last cached values, however old, instead of an error. This never wakes the car. Clients such as evcc then keep the
-		// last known state (e.g. charging_state) rather than seeing a 503 for every request.
-		if strings.Contains(apiResponse.Error, "vehicle is sleeping") {
+		// Opt-in (serveStaleWhenAsleep): the car is asleep, so answer from the last cached values,
+		// however old, and mark the answer as stale. This never wakes the car. Without the option the
+		// client gets the 503 "vehicle is sleeping" as before.
+		if config.AppConfig.ServeStaleWhenAsleep && strings.Contains(apiResponse.Error, "vehicle is sleeping") {
 			vehicleDataCacheMux.RLock()
+			var oldest time.Duration
 			complete := true
-			for _, endpoint := range missingEndpoints {
-				if entry, ok := vehicleDataCache[generateVehicleDataCacheKey(vin, endpoint)]; ok {
-					cachedData[endpoint] = entry.data
-				} else {
+			combinedResponse := make(map[string]json.RawMessage)
+			for _, endpoint := range endpoints {
+				entry, ok := vehicleDataCache[generateVehicleDataCacheKey(vin, endpoint)]
+				if !ok {
 					complete = false
+					break
+				}
+				combinedResponse[endpoint] = entry.data
+				if age := time.Since(entry.timestamp); age > oldest {
+					oldest = age
 				}
 			}
 			vehicleDataCacheMux.RUnlock()
 
 			if complete {
-				combinedResponse := make(map[string]json.RawMessage)
-				for _, endpoint := range endpoints {
-					combinedResponse[endpoint] = cachedData[endpoint]
-				}
 				if responseJson, err := json.Marshal(combinedResponse); err == nil {
-					logging.Debug("Vehicle is sleeping, serving stale data from cache", "VIN", vin)
+					ageSeconds := int(oldest.Seconds())
+					logging.Debug("Vehicle is sleeping, serving stale data from cache", "VIN", vin, "AgeSeconds", ageSeconds)
 					response.Result = true
-					response.Reason = "The vehicle is sleeping. The request was processed from cache without waking it. Data may be stale."
+					response.Reason = fmt.Sprintf("The vehicle is sleeping. Served from cache without waking it; the data is up to %ds old.", ageSeconds)
 					response.Response = responseJson
+					response.Stale = true
+					response.CacheAgeSeconds = &ageSeconds
 					return
 				}
 			}

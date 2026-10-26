@@ -211,6 +211,12 @@ The vehicle data is fetched from the vehicle and returned in the response in the
 
 **Caching:** VehicleData responses are cached in memory for faster subsequent requests. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN. The cache time can be configured via the `vehicleDataCacheTime` environment variable (default: 30 seconds). If all requested endpoints are cached and valid, the response is returned immediately without establishing a BLE connection.
 
+**Sleeping car and stale data**
+
+*(unreleased)*
+
+By default, a request for a sleeping car whose cache has expired returns 503 "vehicle is sleeping". With [`serveStaleWhenAsleep`](docs/environment_variables.md#servestalewhenasleep) the last cached values are returned instead, without waking the car, and the response is marked with `"stale": true` and `"cache_age_seconds"`. With [`wakeWhenNotCached`](docs/environment_variables.md#wakewhennotcached) the car is woken once if an endpoint has never been cached. Both are off by default.
+
 **Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. This allows for efficient data retrieval when the vehicle is already awake. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter. The proxy uses intelligent caching to minimize unnecessary wakeup calls - if the vehicle was confirmed awake within the last 9 minutes, the sleep status check is skipped.
 
 #### Example Request
