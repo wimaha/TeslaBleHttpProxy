@@ -208,40 +208,64 @@ func TestHTTPVehicleDataIsCached(t *testing.T) {
 	}
 }
 
-// If the car cannot be reached, cached endpoints are still served.
-func TestHTTPVehicleDataFallsBackToCache(t *testing.T) {
+// A sleeping car is answered from the cache, however old, and is not woken by it.
+func TestHTTPVehicleDataServesStaleWhenAsleep(t *testing.T) {
 	vin := newVin()
 	p := startProxy(t, vin)
-	base := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints="
+	config.AppConfig.VehicleDataCacheTime = 1 // seconds
+	p.car.BatteryLevel = 77
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
 
-	code, resp := p.do("GET", base+"charge_state", "")
+	code, resp := p.do("GET", path, "")
 	wantStatus(t, code, resp, http.StatusOK)
-	p.car.Do(func(c *fakecar.Car) { c.Asleep = true }) // and wakeup is not requested
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // let the entry expire
 
-	code, resp = p.do("GET", base+"charge_state;climate_state", "")
+	code, resp = p.do("GET", path, "")
 
 	wantStatus(t, code, resp, http.StatusOK)
-	if !strings.Contains(resp.Reason, "partially") {
-		t.Errorf("reason = %q, want partial answer", resp.Reason)
+	if !strings.Contains(resp.Reason, "sleeping") || !strings.Contains(string(resp.Response), "charge_state") {
+		t.Errorf("reason = %q, response = %s", resp.Reason, resp.Response)
 	}
-	if !strings.Contains(string(resp.Response), "charge_state") || strings.Contains(string(resp.Response), "climate_state") {
-		t.Errorf("response = %s, want only the cached charge_state", resp.Response)
+	if n := p.car.Count("Wakeup"); n != 0 {
+		t.Errorf("Wakeup count = %d, want 0", n)
 	}
 }
 
-func TestHTTPVehicleDataSleepingCar(t *testing.T) {
+// A never-cached endpoint wakes the car exactly once; afterwards the cache is used.
+func TestHTTPVehicleDataWakesOnlyWhenNeverCached(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	config.AppConfig.VehicleDataCacheTime = 1 // seconds
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Fatalf("Wakeup count = %d, want 1 (nothing cached yet)", n)
+	}
+
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // let the entry expire
+	code, resp = p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Errorf("Wakeup count = %d, want still 1 (served from cache)", n)
+	}
+}
+
+// Nothing cached yet: a sleeping car is woken once so that there is something to serve.
+func TestHTTPVehicleDataSleepingCarNothingCached(t *testing.T) {
 	vin := newVin()
 	p := startProxy(t, vin)
 	p.car.Asleep = true
 
 	code, resp := p.do("GET", "/api/1/vehicles/"+vin+"/vehicle_data", "")
 
-	wantStatus(t, code, resp, http.StatusServiceUnavailable)
-	if !strings.Contains(resp.Reason, "sleeping") {
-		t.Errorf("reason = %q", resp.Reason)
-	}
-	if n := p.car.Count("Wakeup"); n != 0 {
-		t.Errorf("Wakeup count = %d, want 0", n)
+	wantStatus(t, code, resp, http.StatusOK)
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Errorf("Wakeup count = %d, want 1", n)
 	}
 }
 

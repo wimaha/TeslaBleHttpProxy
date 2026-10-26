@@ -240,6 +240,7 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 	vehicleDataCacheMux.RLock()
 	cachedData := make(map[string]json.RawMessage) // endpoint -> cached data
 	missingEndpoints := []string{}
+	neverCached := false // at least one endpoint has no cache entry at all, not even an expired one
 
 	for _, endpoint := range endpoints {
 		cacheKey := generateVehicleDataCacheKey(vin, endpoint)
@@ -258,6 +259,7 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 		} else {
 			// Cache miss for this endpoint
 			logging.Debug("VehicleData endpoint cache miss", "VIN", vin, "Endpoint", endpoint)
+			neverCached = true
 			missingEndpoints = append(missingEndpoints, endpoint)
 		}
 	}
@@ -284,6 +286,12 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 	}
 
 	// Some endpoints missing/expired - fetch from BLE
+	// An endpoint that was never cached has nothing to fall back on, so wake the car to fill the
+	// cache. Once cached, later requests (even expired ones) no longer wake it.
+	if neverCached && !wakeup {
+		logging.Debug("VehicleData endpoint never cached, waking the vehicle once to fill the cache", "VIN", vin)
+		wakeup = true
+	}
 	var apiResponse models.ApiResponse
 	wg := sync.WaitGroup{}
 	apiResponse.Wait = &wg
@@ -336,6 +344,35 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 		response.Reason = "The request was successfully processed."
 		response.Response = responseJson
 	} else {
+		// The car is asleep: answer from the last cached values, however old, instead of an error. This never wakes the car. Clients such as evcc then keep the
+		// last known state (e.g. charging_state) rather than seeing a 503 for every request.
+		if strings.Contains(apiResponse.Error, "vehicle is sleeping") {
+			vehicleDataCacheMux.RLock()
+			complete := true
+			for _, endpoint := range missingEndpoints {
+				if entry, ok := vehicleDataCache[generateVehicleDataCacheKey(vin, endpoint)]; ok {
+					cachedData[endpoint] = entry.data
+				} else {
+					complete = false
+				}
+			}
+			vehicleDataCacheMux.RUnlock()
+
+			if complete {
+				combinedResponse := make(map[string]json.RawMessage)
+				for _, endpoint := range endpoints {
+					combinedResponse[endpoint] = cachedData[endpoint]
+				}
+				if responseJson, err := json.Marshal(combinedResponse); err == nil {
+					logging.Debug("Vehicle is sleeping, serving stale data from cache", "VIN", vin)
+					response.Result = true
+					response.Reason = "The vehicle is sleeping. The request was processed from cache without waking it. Data may be stale."
+					response.Response = responseJson
+					return
+				}
+			}
+		}
+
 		// BLE fetch failed - try to serve from cache if available
 		if len(cachedData) > 0 {
 			logging.Debug("BLE fetch failed, serving partial data from cache", "VIN", vin, "CachedEndpoints", len(cachedData))
