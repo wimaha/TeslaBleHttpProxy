@@ -94,8 +94,8 @@ type Config struct {
 	VehicleDataCacheTime   int      // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
 	TrustedOrigins         []string // Origins (scheme://host[:port]) allowed to send state-changing requests from a browser, e.g. a reverse proxy that rewrites the Host header.
 	ConnectionTimeout      int      // Seconds a BLE connection is kept open after a command for further commands.
-	ServeStaleWhenAsleep   bool     // Opt-in: if the car is asleep, answer vehicle_data from the cache however old (marked as stale) instead of an error. Never wakes the car.
-	WakeWhenNotCached      bool     // Opt-in: wake the car once if a requested vehicle_data endpoint was never cached, to fill the cache.
+	ServeStaleWhenAsleep   bool     // Opt-in: if the car is asleep, answer vehicle_data from the cache at most 24 hours old (marked as stale) instead of an error. Never wakes the car.
+	WakeWhenNotCached      bool     // Opt-in: wake the car if a requested vehicle_data endpoint was never cached, to fill the cache; at most once per hour and endpoint.
 	ReleaseAdapterWhenIdle bool     // Hand the BLE adapter back to the system between connections, so other Bluetooth services can use it.
 }
 
