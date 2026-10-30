@@ -211,6 +211,70 @@ The vehicle data is fetched from the vehicle and returned in the response in the
 
 **Caching:** VehicleData responses are cached in memory for faster subsequent requests. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN. The cache time can be configured via the `vehicleDataCacheTime` environment variable (default: 30 seconds). If all requested endpoints are cached and valid, the response is returned immediately without establishing a BLE connection.
 
+**Sleeping car and stale data**
+
+*(unreleased)*
+
+By default, a request for a sleeping car whose cache has expired returns 503 "vehicle is sleeping". With [`serveStaleWhenAsleep`](docs/environment_variables.md#servestalewhenasleep) the last cached values are returned instead (at most 24 hours old), without waking the car, and the response is marked with `"stale": true` and `"cache_age_seconds"`. This also applies when the sleep status of the car cannot be read. Note that this is still an HTTP 200 and that evcc and Home Assistant ignore the marker, so they show the old values as current; see the warning in the linked section. With [`wakeWhenNotCached`](docs/environment_variables.md#wakewhennotcached) the car is woken, at most once per hour and endpoint, if it has never been cached; the cache is lost when the proxy restarts, so this wakes the car again after every restart. Both options are off by default.
+
+**Wake Up Behavior:** Commands **automatically wake up** the vehicle if it is asleep. You don't need to manually wake the vehicle or use any parameters - the proxy handles this automatically to ensure commands execute successfully.
+
+#### Example Request
+
+*(All requests with method POST.)*
+
+Start charging:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start`
+
+Start charging and wait for the command to complete:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_start?wait=true`
+
+Stop charging:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/charge_stop`
+
+Set charging amps to 5A:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_charging_amps` with body `{"charging_amps": "5"}`
+
+Set the charge limit to 80 %:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_charge_limit` with body `{"percent": 80}`
+
+Turn Sentry Mode on (`false` turns it off):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_sentry_mode` with body `{"on": true}`
+
+Set cabin temperature to 21 °C (Celsius, 15-28; `passenger_temp` is optional and defaults to `driver_temp`):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/set_temps` with body `{"driver_temp": 21, "passenger_temp": 21}`
+
+Open or close the rear trunk (`front` opens the frunk; it cannot be closed remotely):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/actuate_trunk` with body `{"which_trunk": "rear"}`
+
+Notes on these two commands:
+- Both need a key with the **Owner** role. The car refuses them for a Charging Manager key.
+- `rear` is a **toggle**: it opens a closed trunk and closes an open one. A failed `rear` command is not retried, because the car may already have moved the trunk before the reply was lost; it is reported as `result: false`. Read `closure_statuses.rear_trunk` from `body_controller_state` before sending it again.
+- An invalid body (for example `driver_temp` out of range) is rejected with `result: false` before the proxy connects to the car, so it does not wake the car.
+
+Explicitly wake up the vehicle:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/wake_up`
+
+Add a charging schedule (times are minutes after midnight, so 600 is 10:00):
+`http://localhost:8080/api/1/vehicles/{VIN}/command/add_charge_schedule` with body `{"lat": 50.1, "lon": 14.4, "days_of_week": "Monday,Friday", "start_enabled": true, "start_time": 600, "end_enabled": true, "end_time": 720, "one_time": false, "enabled": true}`
+
+`days_of_week` is either the Fleet API bitmask (Sunday=1, Monday=2, Tuesday=4, Wednesday=8, Thursday=16, Friday=32, Saturday=64, so `34` is Monday and Friday) or text: `All`, `Weekdays` or comma-separated full day names. `lat`, `lon` and `days_of_week` are required: a schedule at 0,0 or without days would be stored but never apply. Every call without `id` creates a new schedule, so include `id` to change an existing one. Omitted `enabled`, `start_enabled`, `end_enabled` and `one_time` are false. A failed call without `id` is not retried, to avoid a duplicate schedule. Unknown day names, wrong types and times outside 0-1439 are rejected with an error.
+
+Remove a charging schedule:
+`http://localhost:8080/api/1/vehicles/{VIN}/command/remove_charge_schedule` with body `{"id": 3}`
+
+### Vehicle Data
+
+The vehicle data is fetched from the vehicle and returned in the response in the same format as the [Fleet API](https://developer.tesla.com/docs/fleet-api/endpoints/vehicle-endpoints#vehicle-data). Since a ble connection has to be established to fetch the data, it takes a few seconds before the data is returned.
+
+**Caching:** VehicleData responses are cached in memory for faster subsequent requests. Each endpoint (e.g., `charge_state`, `climate_state`) is cached separately per VIN. The cache time can be configured via the `vehicleDataCacheTime` environment variable (default: 30 seconds). If all requested endpoints are cached and valid, the response is returned immediately without establishing a BLE connection.
+
+**Sleeping car and stale data**
+
+*(unreleased)*
+
+By default, a request for a sleeping car whose cache has expired returns 503 "vehicle is sleeping". With [`serveStaleWhenAsleep`](docs/environment_variables.md#servestalewhenasleep) the last cached values are returned instead, without waking the car, and the response is marked with `"stale": true` and `"cache_age_seconds"`. With [`wakeWhenNotCached`](docs/environment_variables.md#wakewhennotcached) the car is woken once if an endpoint has never been cached. Both are off by default.
+
 **Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. This allows for efficient data retrieval when the vehicle is already awake. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter. The proxy uses intelligent caching to minimize unnecessary wakeup calls - if the vehicle was confirmed awake within the last 9 minutes, the sleep status check is skipped.
 
 #### Example Request

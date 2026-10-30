@@ -31,6 +31,41 @@ var (
 	vehicleDataCacheMux sync.RWMutex
 )
 
+// Limits of the opt-in options. They are variables only so that tests can shorten them.
+var (
+	// staleMaxAge is the oldest cached value that serveStaleWhenAsleep still serves.
+	staleMaxAge = 24 * time.Hour
+	// wakeRetryInterval is the minimum time between two wake-ups for the same never-cached endpoint.
+	wakeRetryInterval = time.Hour
+)
+
+// wakeAttempted remembers when wakeWhenNotCached last woke the car for an endpoint (key
+// "VIN:endpoint"), whether or not that filled the cache. An endpoint is woken for at most once per
+// wakeRetryInterval, so one that never gets cached (the car keeps failing) cannot wake the car on
+// every poll. It is kept in memory only, so it is empty again after a restart.
+var (
+	wakeAttempted    = make(map[string]time.Time)
+	wakeAttemptedMux sync.Mutex
+)
+
+// shouldWakeForUncached reports whether the car should be woken because of endpoints that were
+// never cached, and records the attempt so that each endpoint is woken for at most once per
+// wakeRetryInterval.
+func shouldWakeForUncached(vin string, endpoints []string) bool {
+	wakeAttemptedMux.Lock()
+	defer wakeAttemptedMux.Unlock()
+	now := time.Now()
+	wake := false
+	for _, endpoint := range endpoints {
+		key := generateVehicleDataCacheKey(vin, endpoint)
+		if last, ok := wakeAttempted[key]; !ok || now.Sub(last) >= wakeRetryInterval {
+			wakeAttempted[key] = now
+			wake = true
+		}
+	}
+	return wake
+}
+
 // bodyControllerCache keeps the last successful body_controller_state per VIN for the dashboard.
 // It is never used to answer body_controller_state itself.
 var (
@@ -232,6 +267,14 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	fetchVehicleData(r.Context(), bc, vin, endpoints, cacheTime, r.URL.Query().Get("wakeup") == "true", &response)
 }
 
+// isSleepError reports whether a failed read means the car cannot be read without waking it:
+// it is asleep, or its sleep status could not be determined (for example while it is waking up
+// or the Bluetooth connection is unstable) and the request did not ask to wake it.
+func isSleepError(message string) bool {
+	return strings.Contains(message, "vehicle is sleeping") ||
+		strings.Contains(message, "vehicle sleep status unknown and wakeup not requested")
+}
+
 // fetchVehicleData fills response with the endpoints: from the cache where an entry is younger
 // than cacheTime, the rest over BLE, which is then cached. If the BLE request fails, it falls
 // back to what is cached. wakeup wakes the car if it is asleep.
@@ -240,6 +283,7 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 	vehicleDataCacheMux.RLock()
 	cachedData := make(map[string]json.RawMessage) // endpoint -> cached data
 	missingEndpoints := []string{}
+	neverCached := []string{} // endpoints without any cache entry, not even an expired one
 
 	for _, endpoint := range endpoints {
 		cacheKey := generateVehicleDataCacheKey(vin, endpoint)
@@ -258,6 +302,7 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 		} else {
 			// Cache miss for this endpoint
 			logging.Debug("VehicleData endpoint cache miss", "VIN", vin, "Endpoint", endpoint)
+			neverCached = append(neverCached, endpoint)
 			missingEndpoints = append(missingEndpoints, endpoint)
 		}
 	}
@@ -284,6 +329,13 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 	}
 
 	// Some endpoints missing/expired - fetch from BLE
+	// Opt-in (wakeWhenNotCached): an endpoint that was never cached has nothing to serve while the
+	// car sleeps, so wake it to fill the cache, at most once per hour and endpoint. Without the option
+	// the car is only woken when the client asks with wakeup=true.
+	if len(neverCached) > 0 && !wakeup && config.AppConfig.WakeWhenNotCached && shouldWakeForUncached(vin, neverCached) {
+		logging.Debug("VehicleData endpoint never cached, waking the vehicle once to fill the cache", "VIN", vin, "Endpoints", neverCached)
+		wakeup = true
+	}
 	var apiResponse models.ApiResponse
 	wg := sync.WaitGroup{}
 	apiResponse.Wait = &wg
@@ -336,6 +388,47 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 		response.Reason = "The request was successfully processed."
 		response.Response = responseJson
 	} else {
+		// Opt-in (serveStaleWhenAsleep): the car is asleep, or its sleep status is unknown, and the
+		// request does not wake it. Answer from the last cached values (at most 24 hours old) and mark
+		// the answer as stale. This never wakes the car. Without the option the client gets the 503
+		// ("vehicle is sleeping" or "sleep status unknown") as before.
+		if config.AppConfig.ServeStaleWhenAsleep && isSleepError(apiResponse.Error) {
+			vehicleDataCacheMux.RLock()
+			var oldest time.Duration
+			complete := true
+			combinedResponse := make(map[string]json.RawMessage)
+			for _, endpoint := range endpoints {
+				entry, ok := vehicleDataCache[generateVehicleDataCacheKey(vin, endpoint)]
+				if !ok {
+					complete = false
+					break
+				}
+				combinedResponse[endpoint] = entry.data
+				if age := time.Since(entry.timestamp); age > oldest {
+					oldest = age
+				}
+			}
+			vehicleDataCacheMux.RUnlock()
+
+			if complete && oldest > staleMaxAge {
+				logging.Debug("Cached data is too old to serve while the vehicle sleeps", "VIN", vin, "Age", oldest, "Max", staleMaxAge)
+				complete = false
+			}
+
+			if complete {
+				if responseJson, err := json.Marshal(combinedResponse); err == nil {
+					ageSeconds := int(oldest.Seconds())
+					logging.Debug("Vehicle is sleeping, serving stale data from cache", "VIN", vin, "AgeSeconds", ageSeconds)
+					response.Result = true
+					response.Reason = fmt.Sprintf("The vehicle is sleeping. Served from cache without waking it; the data is up to %ds old.", ageSeconds)
+					response.Response = responseJson
+					response.Stale = true
+					response.CacheAgeSeconds = &ageSeconds
+					return
+				}
+			}
+		}
+
 		// BLE fetch failed - try to serve from cache if available
 		if len(cachedData) > 0 {
 			logging.Debug("BLE fetch failed, serving partial data from cache", "VIN", vin, "CachedEndpoints", len(cachedData))

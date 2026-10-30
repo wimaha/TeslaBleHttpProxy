@@ -94,6 +94,8 @@ type Config struct {
 	VehicleDataCacheTime   int      // Seconds to cache VehicleData endpoint responses in memory. Each endpoint is cached separately per VIN.
 	TrustedOrigins         []string // Origins (scheme://host[:port]) allowed to send state-changing requests from a browser, e.g. a reverse proxy that rewrites the Host header.
 	ConnectionTimeout      int      // Seconds a BLE connection is kept open after a command for further commands.
+	ServeStaleWhenAsleep   bool     // Opt-in: if the car is asleep, answer vehicle_data from the cache at most 24 hours old (marked as stale) instead of an error. Never wakes the car.
+	WakeWhenNotCached      bool     // Opt-in: wake the car if a requested vehicle_data endpoint was never cached, to fill the cache; at most once per hour and endpoint.
 	ReleaseAdapterWhenIdle bool     // Hand the BLE adapter back to the system between connections, so other Bluetooth services can use it.
 }
 
@@ -168,6 +170,24 @@ func LoadConfig() *Config {
 	}
 	logging.Info("Env:", "releaseAdapterWhenIdle", releaseAdapterWhenIdle)
 
+	serveStaleWhenAsleep := false
+	if value := os.Getenv("serveStaleWhenAsleep"); value != "" {
+		if serveStaleWhenAsleep, err = strconv.ParseBool(value); err != nil {
+			logging.Error("Invalid serveStaleWhenAsleep value, using default (false)", "value", value, "error", err)
+			serveStaleWhenAsleep = false
+		}
+	}
+	logging.Info("Env:", "serveStaleWhenAsleep", serveStaleWhenAsleep)
+
+	wakeWhenNotCached := false
+	if value := os.Getenv("wakeWhenNotCached"); value != "" {
+		if wakeWhenNotCached, err = strconv.ParseBool(value); err != nil {
+			logging.Error("Invalid wakeWhenNotCached value, using default (false)", "value", value, "error", err)
+			wakeWhenNotCached = false
+		}
+	}
+	logging.Info("Env:", "wakeWhenNotCached", wakeWhenNotCached)
+
 	var trustedOrigins []string
 	for _, origin := range strings.Split(os.Getenv("trustedOrigins"), ",") {
 		if origin = strings.TrimSpace(origin); origin != "" {
@@ -186,6 +206,8 @@ func LoadConfig() *Config {
 		VehicleDataCacheTime:   vehicleDataCacheTimeInt,
 		TrustedOrigins:         trustedOrigins,
 		ConnectionTimeout:      connectionTimeoutInt,
+		ServeStaleWhenAsleep:   serveStaleWhenAsleep,
+		WakeWhenNotCached:      wakeWhenNotCached,
 		ReleaseAdapterWhenIdle: releaseAdapterWhenIdle,
 	}
 }

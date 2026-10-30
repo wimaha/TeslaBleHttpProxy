@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/wimaha/TeslaBleHttpProxy/config"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/api/handlers"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/routes"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
@@ -226,6 +227,182 @@ func TestHTTPVehicleDataFallsBackToCache(t *testing.T) {
 	}
 	if !strings.Contains(string(resp.Response), "charge_state") || strings.Contains(string(resp.Response), "climate_state") {
 		t.Errorf("response = %s, want only the cached charge_state", resp.Response)
+	}
+}
+
+// By default an expired cache is not served for a sleeping car: it stays a 503 and does not wake it.
+func TestHTTPVehicleDataExpiredCacheSleepingCarIsError(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	config.AppConfig.VehicleDataCacheTime = 1 // seconds
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // let the entry expire
+
+	code, resp = p.do("GET", path, "")
+
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+	if resp.Stale {
+		t.Error("stale must not be set on an error")
+	}
+	if n := p.car.Count("Wakeup"); n != 0 {
+		t.Errorf("Wakeup count = %d, want 0", n)
+	}
+}
+
+// serveStaleWhenAsleep: an expired cache is served for a sleeping car, marked as stale, without waking it.
+func TestHTTPVehicleDataServesStaleWhenAsleep(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	config.AppConfig.ServeStaleWhenAsleep = true
+	config.AppConfig.VehicleDataCacheTime = 1 // seconds
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if resp.Stale {
+		t.Error("fresh data must not be marked stale")
+	}
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // let the entry expire
+
+	code, resp = p.do("GET", path, "")
+
+	wantStatus(t, code, resp, http.StatusOK)
+	if !resp.Stale || resp.CacheAgeSeconds == nil || *resp.CacheAgeSeconds < 1 {
+		t.Errorf("stale = %v, cache_age_seconds = %v, want stale with an age of at least 1", resp.Stale, resp.CacheAgeSeconds)
+	}
+	if !strings.Contains(string(resp.Response), "charge_state") {
+		t.Errorf("response = %s", resp.Response)
+	}
+	if n := p.car.Count("Wakeup"); n != 0 {
+		t.Errorf("Wakeup count = %d, want 0", n)
+	}
+
+	// An endpoint that was never cached is still an error.
+	code, resp = p.do("GET", "/api/1/vehicles/"+vin+"/vehicle_data?endpoints=climate_state", "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+}
+
+// wakeWhenNotCached: a never-cached endpoint wakes the car exactly once; afterwards the cache is used.
+func TestHTTPVehicleDataWakesOnlyWhenNeverCached(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	config.AppConfig.WakeWhenNotCached = true
+	config.AppConfig.ServeStaleWhenAsleep = true
+	config.AppConfig.VehicleDataCacheTime = 1 // seconds
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Fatalf("Wakeup count = %d, want 1 (nothing cached yet)", n)
+	}
+
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // let the entry expire
+	code, resp = p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if !resp.Stale {
+		t.Error("want stale data from the cache")
+	}
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Errorf("Wakeup count = %d, want still 1 (served from cache)", n)
+	}
+}
+
+// Cached values older than the limit (24 hours, shortened here) are not served for a sleeping car.
+func TestHTTPVehicleDataStaleMaxAge(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	t.Cleanup(handlers.SetLimitsForTest(2*time.Second, time.Hour))
+	config.AppConfig.ServeStaleWhenAsleep = true
+	config.AppConfig.VehicleDataCacheTime = 1
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // expired, but younger than the maximum age
+	code, resp = p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if !resp.Stale {
+		t.Error("want stale data below the maximum age")
+	}
+
+	time.Sleep(1200 * time.Millisecond) // now older than the limit
+	code, resp = p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+	if resp.Stale {
+		t.Error("data older than the maximum age must not be served")
+	}
+}
+
+// wakeWhenNotCached wakes at most once per hour and endpoint (shortened here): an endpoint that never
+// gets cached must not wake the car on every poll.
+func TestHTTPVehicleDataWakesOncePerHourPerEndpointEvenOnFailure(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	t.Cleanup(handlers.SetLimitsForTest(24*time.Hour, 2*time.Second))
+	config.AppConfig.WakeWhenNotCached = true
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	p.car.FailNext("GetState", errBusy, errBusy, errBusy, errBusy, errBusy, errBusy)
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Fatalf("Wakeup count = %d, want 1", n)
+	}
+
+	for i := 0; i < 3; i++ {
+		p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+		p.do("GET", path, "")
+	}
+	if n := p.car.Count("Wakeup"); n != 1 {
+		t.Errorf("Wakeup count = %d after more polls, want still 1", n)
+	}
+
+	time.Sleep(2200 * time.Millisecond) // the retry interval has passed
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	p.do("GET", path, "")
+	if n := p.car.Count("Wakeup"); n != 2 {
+		t.Errorf("Wakeup count = %d after the retry interval, want 2", n)
+	}
+}
+
+// If the sleep status cannot be read (the car is waking up, unstable Bluetooth) and the request does
+// not wake the car, it is a 503 by default and stale cache data with serveStaleWhenAsleep.
+func TestHTTPVehicleDataSleepStatusUnknown(t *testing.T) {
+	for _, serveStale := range []bool{false, true} {
+		t.Run(fmt.Sprintf("serveStale=%v", serveStale), func(t *testing.T) {
+			vin := newVin()
+			p := startProxy(t, vin)
+			config.AppConfig.ServeStaleWhenAsleep = serveStale
+			handlers.SeedVehicleDataForTest(vin, "charge_state", `{"charging_state":"Disconnected"}`, 10*time.Minute)
+			p.car.FailNext("BodyControllerState", errBusy)
+
+			code, resp := p.do("GET", "/api/1/vehicles/"+vin+"/vehicle_data?endpoints=charge_state", "")
+
+			if serveStale {
+				wantStatus(t, code, resp, http.StatusOK)
+				if !resp.Stale || resp.CacheAgeSeconds == nil || *resp.CacheAgeSeconds < 600 {
+					t.Errorf("serveStale: stale = %v, cache_age_seconds = %v, want stale with an age of at least 600", resp.Stale, resp.CacheAgeSeconds)
+				}
+			} else {
+				wantStatus(t, code, resp, http.StatusServiceUnavailable)
+				if !strings.Contains(resp.Reason, "sleep status unknown") {
+					t.Errorf("reason = %q", resp.Reason)
+				}
+			}
+			if n := p.car.Count("Wakeup"); n != 0 {
+				t.Errorf("serveStale=%v: Wakeup count = %d, want 0", serveStale, n)
+			}
+		})
 	}
 }
 
