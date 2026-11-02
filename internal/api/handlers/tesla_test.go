@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/wimaha/TeslaBleHttpProxy/config"
+	"github.com/wimaha/TeslaBleHttpProxy/internal/api/handlers"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/models"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/api/routes"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/ble/control"
@@ -226,6 +227,81 @@ func TestHTTPVehicleDataFallsBackToCache(t *testing.T) {
 	}
 	if !strings.Contains(string(resp.Response), "charge_state") || strings.Contains(string(resp.Response), "climate_state") {
 		t.Errorf("response = %s, want only the cached charge_state", resp.Response)
+	}
+}
+
+// allow_stale=true answers a sleeping car from the cache, however old, marked as stale and without
+// waking it. Without the parameter it stays a 503.
+func TestHTTPVehicleDataAllowStale(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	p.car.Asleep = true
+	handlers.SeedVehicleDataForTest(vin, "charge_state", `{"charging_state":"Disconnected"}`, 10*time.Minute)
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path+"&allow_stale=true", "")
+
+	wantStatus(t, code, resp, http.StatusOK)
+	if !resp.Stale || resp.CacheAgeSeconds == nil || *resp.CacheAgeSeconds < 600 {
+		t.Errorf("stale = %v, cache_age_seconds = %v, want stale with an age of at least 600", resp.Stale, resp.CacheAgeSeconds)
+	}
+	if !strings.Contains(string(resp.Response), "Disconnected") {
+		t.Errorf("response = %s", resp.Response)
+	}
+
+	code, resp = p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+	if resp.Stale {
+		t.Error("without allow_stale the answer must not be stale")
+	}
+	if n := p.car.Count("Wakeup"); n != 0 {
+		t.Errorf("Wakeup count = %d, want 0", n)
+	}
+}
+
+// allow_stale=true does not serve entries older than 24 hours or endpoints that were never cached.
+func TestHTTPVehicleDataAllowStaleLimits(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	p.car.Asleep = true
+	base := "/api/1/vehicles/" + vin + "/vehicle_data?allow_stale=true&endpoints="
+	handlers.SeedVehicleDataForTest(vin, "charge_state", `{}`, 25*time.Hour)
+	handlers.SeedVehicleDataForTest(vin, "drive_state", `{}`, time.Minute)
+
+	code, resp := p.do("GET", base+"charge_state", "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+
+	code, resp = p.do("GET", base+"drive_state;climate_state", "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+}
+
+// The sleep check is skipped for 9 minutes after the car was seen awake. If it fell asleep in the
+// meantime, the infotainment handshake fails; that is still "asleep", so allow_stale applies.
+func TestHTTPVehicleDataAllowStaleAfterHandshakeFails(t *testing.T) {
+	vin := newVin()
+	p := startProxy(t, vin)
+	config.AppConfig.VehicleDataCacheTime = 1 // seconds
+	path := "/api/1/vehicles/" + vin + "/vehicle_data?endpoints=charge_state"
+
+	code, resp := p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusOK)
+	p.car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	time.Sleep(1100 * time.Millisecond) // let the entry expire
+
+	code, resp = p.do("GET", path+"&allow_stale=true", "")
+	wantStatus(t, code, resp, http.StatusOK)
+	if !resp.Stale {
+		t.Errorf("want stale data, got reason %q", resp.Reason)
+	}
+
+	time.Sleep(1100 * time.Millisecond) // the stale answer does not refresh the cache
+	code, resp = p.do("GET", path, "")
+	wantStatus(t, code, resp, http.StatusServiceUnavailable)
+	if !strings.Contains(resp.Reason, "sleeping") {
+		t.Errorf("reason = %q, want sleeping", resp.Reason)
+	}
+	if n := p.car.Count("Wakeup"); n != 0 {
+		t.Errorf("Wakeup count = %d, want 0", n)
 	}
 }
 

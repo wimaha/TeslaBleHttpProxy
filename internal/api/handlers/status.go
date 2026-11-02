@@ -133,5 +133,5 @@ func RefreshStatus(w http.ResponseWriter, r *http.Request) {
 	if bc == nil {
 		return
 	}
-	fetchVehicleData(r.Context(), bc, vin, statusEndpoints, 0, wakeup, &response)
+	fetchVehicleData(r.Context(), bc, vin, statusEndpoints, 0, wakeup, false, &response)
 }

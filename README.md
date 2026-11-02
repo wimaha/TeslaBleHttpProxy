@@ -213,6 +213,12 @@ The vehicle data is fetched from the vehicle and returned in the response in the
 
 **Wake Up Behavior:** By default, the car is **not** automatically woken up before fetching vehicle data. This allows for efficient data retrieval when the vehicle is already awake. If your vehicle is asleep and you need to wake it up first, you can use the `wakeup=true` parameter. The proxy uses intelligent caching to minimize unnecessary wakeup calls - if the vehicle was confirmed awake within the last 9 minutes, the sleep status check is skipped.
 
+**Stale data:**
+
+*(unreleased)*
+
+If the vehicle is asleep and `wakeup=true` is not set, the request fails with 503 "vehicle is sleeping". With `allow_stale=true` the proxy answers from the cache instead, with values up to 24 hours old, and does not wake the vehicle. The answer is HTTP 200 (`result: true`). Two new fields are added next to `result` and `reason`: `"stale": true` and `"cache_age_seconds"`, the age of the oldest value in **seconds**; the `reason` says that the data is old. Both fields only appear in a stale answer; all other answers are unchanged. If an endpoint was never cached, or a value is older than 24 hours, the request still fails with 503. Clients that do not look at `stale` show the old values as current, so only use the parameter where that is acceptable. Use `wakeup=true` instead when you need fresh data.
+
 #### Example Request
 
 *(All requests with method GET.)*
@@ -222,6 +228,9 @@ Get vehicle data:
 
 Get vehicle data with automatic wakeup:
 `http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?wakeup=true`
+
+Get vehicle data, from the cache if the vehicle is asleep (never wakes it):
+`http://localhost:8080/api/1/vehicles/{VIN}/vehicle_data?allow_stale=true`
 
 By default you will receive the following data:
 

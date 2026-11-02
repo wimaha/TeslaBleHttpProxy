@@ -252,6 +252,10 @@ func (bc *BleControl) failQueued() {
 	}
 }
 
+// ErrVehicleAsleep is returned for a request that needs the car awake while it is asleep and the
+// request did not ask to wake it. Use errors.Is to detect it.
+var ErrVehicleAsleep = errors.New("vehicle is sleeping")
+
 // failCommand reports err to whoever waits for the command.
 func failCommand(command *commands.Command, err error) {
 	if command.Response == nil {
@@ -260,6 +264,7 @@ func failCommand(command *commands.Command, err error) {
 		return
 	}
 	command.Response.Error = err.Error()
+	command.Response.Err = err
 	command.Response.Result = false
 	if command.Response.Wait != nil {
 		command.Response.Wait.Done()
@@ -327,6 +332,15 @@ func (bc *BleControl) markVehicleAwake(vin string) {
 	bc.lastAwakeTime[vin] = time.Now()
 	bc.awakeTimeMu.Unlock()
 	bc.status.sleepStatus(vin, SleepStatusAwake)
+}
+
+// markVehicleAsleep records that the vehicle was seen asleep, so the next vehicle_data request
+// checks the sleep status again instead of trusting an earlier awake.
+func (bc *BleControl) markVehicleAsleep(vin string) {
+	bc.awakeTimeMu.Lock()
+	delete(bc.lastAwakeTime, vin)
+	bc.awakeTimeMu.Unlock()
+	bc.status.sleepStatus(vin, SleepStatusAsleep)
 }
 
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
@@ -577,7 +591,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 						} else {
 							sleepStatus := vs.GetVehicleSleepStatus().String()
 							if strings.Contains(sleepStatus, "ASLEEP") {
-								bc.status.sleepStatus(firstCommand.Vin, SleepStatusAsleep)
+								bc.markVehicleAsleep(firstCommand.Vin)
 								logging.Debug("Vehicle is asleep")
 								if firstCommand.AutoWakeup {
 									logging.Debug("Waking up vehicle as requested ...")
@@ -588,7 +602,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 									// Mark as awake after successful wakeup
 									bc.markVehicleAwake(firstCommand.Vin)
 								} else {
-									return nil, false, fmt.Errorf("vehicle is sleeping")
+									return nil, false, ErrVehicleAsleep
 								}
 							} else if strings.Contains(sleepStatus, "AWAKE") {
 								logging.Debug("Vehicle is already awake")
@@ -630,6 +644,16 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 					protocol.DomainVCSEC,
 					protocol.DomainInfotainment,
 				}); err != nil {
+					// The sleep check above is skipped for 9 minutes after the car was seen awake, so
+					// the car may have fallen asleep since. VCSEC works while it sleeps: if it is
+					// asleep and the request does not wake it, report that instead of a handshake error.
+					if firstCommand.Command == "vehicle_data" && !firstCommand.AutoWakeup {
+						if vs, vsErr := car.BodyControllerState(ctx); vsErr == nil && strings.Contains(vs.GetVehicleSleepStatus().String(), "ASLEEP") {
+							bc.markVehicleAsleep(firstCommand.Vin)
+							logging.Debug("Infotainment handshake failed because the vehicle is asleep", "Error", err)
+							return nil, false, ErrVehicleAsleep
+						}
+					}
 					return nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
 				}
 				logging.Info("Connection to vehicle established")
@@ -775,6 +799,7 @@ func (bc *BleControl) ExecuteCommand(car commands.Vehicle, command *commands.Com
 		if command.Response != nil {
 			if retErr != nil {
 				command.Response.Error = retErr.Error()
+				command.Response.Err = retErr
 				command.Response.Result = false
 			} else {
 				command.Response.Result = true

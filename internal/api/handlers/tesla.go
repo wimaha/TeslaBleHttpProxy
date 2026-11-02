@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"slices"
@@ -17,6 +18,9 @@ import (
 	"github.com/wimaha/TeslaBleHttpProxy/internal/logging"
 	"github.com/wimaha/TeslaBleHttpProxy/internal/tesla/commands"
 )
+
+// staleMaxAge is the oldest cached value that allow_stale=true still serves for a sleeping car.
+const staleMaxAge = 24 * time.Hour
 
 // vehicleDataCacheEntry stores a cached endpoint data with timestamp
 type vehicleDataCacheEntry struct {
@@ -229,13 +233,14 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cacheTime := time.Duration(config.AppConfig.VehicleDataCacheTime) * time.Second
-	fetchVehicleData(r.Context(), bc, vin, endpoints, cacheTime, r.URL.Query().Get("wakeup") == "true", &response)
+	fetchVehicleData(r.Context(), bc, vin, endpoints, cacheTime, r.URL.Query().Get("wakeup") == "true", r.URL.Query().Get("allow_stale") == "true", &response)
 }
 
 // fetchVehicleData fills response with the endpoints: from the cache where an entry is younger
 // than cacheTime, the rest over BLE, which is then cached. If the BLE request fails, it falls
-// back to what is cached. wakeup wakes the car if it is asleep.
-func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, endpoints []string, cacheTime time.Duration, wakeup bool, response *models.Response) {
+// back to what is cached. wakeup wakes the car if it is asleep. allowStale answers from the cache,
+// up to staleMaxAge old, if the car is asleep, without waking it.
+func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, endpoints []string, cacheTime time.Duration, wakeup bool, allowStale bool, response *models.Response) {
 	// Check cache for each endpoint
 	vehicleDataCacheMux.RLock()
 	cachedData := make(map[string]json.RawMessage) // endpoint -> cached data
@@ -336,6 +341,12 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 		response.Reason = "The request was successfully processed."
 		response.Response = responseJson
 	} else {
+		// allow_stale=true: the car is asleep, so answer from the cache, marked as stale. The car is
+		// not woken. Without the parameter the client gets the 503 as before.
+		if allowStale && errors.Is(apiResponse.Err, control.ErrVehicleAsleep) && serveStale(vin, endpoints, response) {
+			return
+		}
+
 		// BLE fetch failed - try to serve from cache if available
 		if len(cachedData) > 0 {
 			logging.Debug("BLE fetch failed, serving partial data from cache", "VIN", vin, "CachedEndpoints", len(cachedData))
@@ -357,6 +368,41 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 			response.Reason = apiResponse.Error
 		}
 	}
+}
+
+// serveStale fills response from the cache for allow_stale=true, even after cacheTime, as
+// long as every endpoint is cached and the oldest entry is at most staleMaxAge old. It reports
+// whether it did.
+func serveStale(vin string, endpoints []string, response *models.Response) bool {
+	vehicleDataCacheMux.RLock()
+	defer vehicleDataCacheMux.RUnlock()
+
+	combinedResponse := make(map[string]json.RawMessage)
+	var oldest time.Duration
+	for _, endpoint := range endpoints {
+		entry, ok := vehicleDataCache[generateVehicleDataCacheKey(vin, endpoint)]
+		if !ok {
+			return false
+		}
+		combinedResponse[endpoint] = entry.data
+		oldest = max(oldest, time.Since(entry.timestamp))
+	}
+	if oldest > staleMaxAge {
+		return false
+	}
+	responseJson, err := json.Marshal(combinedResponse)
+	if err != nil {
+		return false
+	}
+
+	ageSeconds := int(oldest.Seconds())
+	logging.Debug("Vehicle is asleep, serving stale data from cache", "VIN", vin, "AgeSeconds", ageSeconds)
+	response.Result = true
+	response.Reason = fmt.Sprintf("The vehicle is sleeping. Served from cache without waking it; the data is up to %ds old.", ageSeconds)
+	response.Response = responseJson
+	response.Stale = true
+	response.CacheAgeSeconds = &ageSeconds
+	return true
 }
 
 func BodyControllerState(w http.ResponseWriter, r *http.Request) {
