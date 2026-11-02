@@ -217,7 +217,7 @@ The vehicle data is fetched from the vehicle and returned in the response in the
 
 *(unreleased)*
 
-If the vehicle is asleep and `wakeup=true` is not set, the request fails with 503 "vehicle is sleeping". With `allow_stale=true` the proxy answers from the cache instead, with values up to 24 hours old, and does not wake the vehicle. The answer is HTTP 200 and marked with `"stale": true` and `"cache_age_seconds"` (age of the oldest value) next to `result`; the `reason` says that the data is old. If an endpoint was never cached, or a value is older than 24 hours, the request still fails with 503. Clients that do not look at `stale` show the old values as current, so only use the parameter where that is acceptable. Use `wakeup=true` instead when you need fresh data.
+If the vehicle is asleep and `wakeup=true` is not set, the request fails with 503 "vehicle is sleeping". With `allow_stale=true` the proxy answers from the cache instead, with values up to 24 hours old, and does not wake the vehicle. The answer is HTTP 200 (`result: true`). Two new fields are added next to `result` and `reason`: `"stale": true` and `"cache_age_seconds"`, the age of the oldest value in **seconds**; the `reason` says that the data is old. Both fields only appear in a stale answer; all other answers are unchanged. If an endpoint was never cached, or a value is older than 24 hours, the request still fails with 503. Clients that do not look at `stale` show the old values as current, so only use the parameter where that is acceptable. Use `wakeup=true` instead when you need fresh data.
 
 #### Example Request
 
