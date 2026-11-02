@@ -178,6 +178,20 @@ func TestVehicleDataHandshakeOfSleepingCarIsAsleep(t *testing.T) {
 	if n := car.Count("Wakeup"); n != 0 {
 		t.Errorf("Wakeup count = %d, want 0", n)
 	}
+
+	// The car was seen asleep, so the next request checks the sleep status over VCSEC instead of
+	// trying the infotainment handshake again.
+	eventually(t, "second disconnect", func() bool { return car.Count("Disconnect") == 2 })
+	sessions, checks := car.Count("StartSession"), car.Count("BodyControllerState")
+
+	mustFail(t, send(t, context.Background(), bc, vin1, "vehicle_data", map[string]interface{}{"endpoints": []string{"charge_state"}}, false), "vehicle is sleeping")
+
+	if n := car.Count("StartSession") - sessions; n != 1 {
+		t.Errorf("StartSession count = %d, want 1 (VCSEC only, no infotainment handshake)", n)
+	}
+	if n := car.Count("BodyControllerState") - checks; n != 1 {
+		t.Errorf("BodyControllerState count = %d, want 1 (sleep check)", n)
+	}
 }
 
 func TestVehicleDataWakesWhenRequested(t *testing.T) {

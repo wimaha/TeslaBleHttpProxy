@@ -239,7 +239,7 @@ func VehicleData(w http.ResponseWriter, r *http.Request) {
 // fetchVehicleData fills response with the endpoints: from the cache where an entry is younger
 // than cacheTime, the rest over BLE, which is then cached. If the BLE request fails, it falls
 // back to what is cached. wakeup wakes the car if it is asleep. allowStale answers from the cache,
-// however old (up to staleMaxAge), if the car is asleep, without waking it.
+// up to staleMaxAge old, if the car is asleep, without waking it.
 func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, endpoints []string, cacheTime time.Duration, wakeup bool, allowStale bool, response *models.Response) {
 	// Check cache for each endpoint
 	vehicleDataCacheMux.RLock()
@@ -370,7 +370,7 @@ func fetchVehicleData(ctx context.Context, bc *control.BleControl, vin string, e
 	}
 }
 
-// serveStale fills response from the cache for allow_stale=true, however old the entries are, as
+// serveStale fills response from the cache for allow_stale=true, even after cacheTime, as
 // long as every endpoint is cached and the oldest entry is at most staleMaxAge old. It reports
 // whether it did.
 func serveStale(vin string, endpoints []string, response *models.Response) bool {

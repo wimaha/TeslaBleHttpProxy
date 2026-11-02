@@ -334,6 +334,15 @@ func (bc *BleControl) markVehicleAwake(vin string) {
 	bc.status.sleepStatus(vin, SleepStatusAwake)
 }
 
+// markVehicleAsleep records that the vehicle was seen asleep, so the next vehicle_data request
+// checks the sleep status again instead of trusting an earlier awake.
+func (bc *BleControl) markVehicleAsleep(vin string) {
+	bc.awakeTimeMu.Lock()
+	delete(bc.lastAwakeTime, vin)
+	bc.awakeTimeMu.Unlock()
+	bc.status.sleepStatus(vin, SleepStatusAsleep)
+}
+
 func (bc *BleControl) connectToVehicleAndOperateConnection(firstCommand *commands.Command) *commands.Command {
 	bleMu.Lock()
 	defer bleMu.Unlock()
@@ -582,7 +591,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 						} else {
 							sleepStatus := vs.GetVehicleSleepStatus().String()
 							if strings.Contains(sleepStatus, "ASLEEP") {
-								bc.status.sleepStatus(firstCommand.Vin, SleepStatusAsleep)
+								bc.markVehicleAsleep(firstCommand.Vin)
 								logging.Debug("Vehicle is asleep")
 								if firstCommand.AutoWakeup {
 									logging.Debug("Waking up vehicle as requested ...")
@@ -640,7 +649,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 					// asleep and the request does not wake it, report that instead of a handshake error.
 					if firstCommand.Command == "vehicle_data" && !firstCommand.AutoWakeup {
 						if vs, vsErr := car.BodyControllerState(ctx); vsErr == nil && strings.Contains(vs.GetVehicleSleepStatus().String(), "ASLEEP") {
-							bc.status.sleepStatus(firstCommand.Vin, SleepStatusAsleep)
+							bc.markVehicleAsleep(firstCommand.Vin)
 							logging.Debug("Infotainment handshake failed because the vehicle is asleep", "Error", err)
 							return nil, false, ErrVehicleAsleep
 						}
