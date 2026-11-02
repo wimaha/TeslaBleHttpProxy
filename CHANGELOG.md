@@ -6,8 +6,7 @@ All notable changes are listed here. `Unreleased` is what `main` and the Docker 
 
 ### Added
 
-- `serveStaleWhenAsleep` environment variable (off by default): if the car is asleep, `vehicle_data` is answered from the cache instead of 503, without waking the car, if the data is at most 24 hours old. This includes the case where the sleep status of the car cannot be read ("vehicle sleep status unknown"). The answer is marked with `stale: true` and `cache_age_seconds`. It is still HTTP 200, and evcc and Home Assistant ignore the marker, so see the warning in [environment variables](docs/environment_variables.md#servestalewhenasleep).
-- `wakeWhenNotCached` environment variable (off by default): wakes the car when a requested `vehicle_data` endpoint has never been cached, to fill the cache, at most once per hour and endpoint. The cache is in memory, so the car is woken again after every proxy restart. See [environment variables](docs/environment_variables.md#wakewhennotcached).
+- `allow_stale=true` for `vehicle_data`: if the car is asleep, the answer comes from the cache (at most 24 hours old) instead of 503, marked with `stale: true` and `cache_age_seconds`. The car is not woken. Without the parameter nothing changes. A car that fell asleep during the 9 minutes in which the sleep check is skipped is now also reported as "vehicle is sleeping" (503) and no longer as a failed handshake.
 
 ## 2.5.0 - 2026-10-19
 

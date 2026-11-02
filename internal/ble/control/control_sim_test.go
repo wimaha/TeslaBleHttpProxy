@@ -156,6 +156,30 @@ func TestVehicleDataDoesNotWakeSleepingCar(t *testing.T) {
 	eventually(t, "disconnect", func() bool { return car.Count("Disconnect") == 1 })
 }
 
+// The sleep check is skipped for 9 minutes after the car was seen awake. If it falls asleep in
+// that time, the infotainment handshake fails; it is reported as ErrVehicleAsleep and not retried.
+func TestVehicleDataHandshakeOfSleepingCarIsAsleep(t *testing.T) {
+	car := fakecar.New(vin1)
+	bc := startControl(t, 20*time.Millisecond, car)
+	mustSucceed(t, send(t, context.Background(), bc, vin1, "vehicle_data", map[string]interface{}{"endpoints": []string{"charge_state"}}, false))
+	eventually(t, "disconnect", func() bool { return car.Count("Disconnect") == 1 })
+	car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	dials := car.Count("Dial")
+
+	resp := send(t, context.Background(), bc, vin1, "vehicle_data", map[string]interface{}{"endpoints": []string{"charge_state"}}, false)
+
+	mustFail(t, resp, "vehicle is sleeping")
+	if !errors.Is(resp.Err, ErrVehicleAsleep) {
+		t.Errorf("err = %v, want ErrVehicleAsleep", resp.Err)
+	}
+	if n := car.Count("Dial") - dials; n != 1 {
+		t.Errorf("Dial count = %d, want 1: a sleeping car is not a reason to retry", n)
+	}
+	if n := car.Count("Wakeup"); n != 0 {
+		t.Errorf("Wakeup count = %d, want 0", n)
+	}
+}
+
 func TestVehicleDataWakesWhenRequested(t *testing.T) {
 	car := fakecar.New(vin1)
 	car.Asleep = true
