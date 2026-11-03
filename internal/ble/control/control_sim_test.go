@@ -191,6 +191,25 @@ func TestVehicleDataRemembersAwakeCar(t *testing.T) {
 	}
 }
 
+// A car that fell asleep within the 9 minutes is still woken when wakeup is requested.
+func TestVehicleDataWakesCarThatFellAsleepWhenRequested(t *testing.T) {
+	car := fakecar.New(vin1)
+	bc := startControl(t, 20*time.Millisecond, car)
+	body := map[string]interface{}{"endpoints": []string{"charge_state"}}
+
+	mustSucceed(t, send(t, context.Background(), bc, vin1, "vehicle_data", body, false))
+	eventually(t, "first disconnect", func() bool { return car.Count("Disconnect") == 1 })
+	car.Do(func(c *fakecar.Car) { c.Asleep = true })
+	mustSucceed(t, send(t, context.Background(), bc, vin1, "vehicle_data", body, true))
+
+	if n := car.Count("Wakeup"); n != 1 {
+		t.Errorf("Wakeup count = %d, want 1", n)
+	}
+	if n := car.Count("Dial"); n != 2 {
+		t.Errorf("Dial count = %d, want 2: the wake-up should not need a retry", n)
+	}
+}
+
 func TestConnectRetriesThenSucceeds(t *testing.T) {
 	car := fakecar.New(vin1)
 	car.FailNext("Dial", errors.New("scan timeout"), errors.New("scan timeout"))

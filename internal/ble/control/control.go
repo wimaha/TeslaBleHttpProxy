@@ -552,6 +552,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 				// For vehicle_data, use conditional wakeup (check cache, only wake if needed)
 				// For all other commands, always wake up if needed
 				isVehicleData := firstCommand.Command == "vehicle_data"
+				skippedSleepCheck := false
 
 				if isVehicleData {
 					// Conditional wakeup for vehicle_data: check cache first
@@ -612,6 +613,7 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 						}
 					} else {
 						logging.Debug("Skipping sleep status check for vehicle_data (vehicle was awake less than 9 minutes ago)")
+						skippedSleepCheck = true
 					}
 				} else {
 					// For commands, always send wakeup (no need to check sleep status first)
@@ -626,10 +628,28 @@ func (bc *BleControl) TryConnectToVehicle(ctx context.Context, firstCommand *com
 
 				logging.Debug("Starting Infotainment session ...")
 				// Then we can also connect the infotainment
-				if err := car.StartSession(ctx, []universalmessage.Domain{
+				err := car.StartSession(ctx, []universalmessage.Domain{
 					protocol.DomainVCSEC,
 					protocol.DomainInfotainment,
-				}); err != nil {
+				})
+				// The car may have fallen asleep since we last saw it awake. If wakeup was
+				// requested, check over VCSEC and wake it instead of failing the handshake.
+				if err != nil && skippedSleepCheck && firstCommand.AutoWakeup {
+					if vs, stateErr := car.BodyControllerState(ctx); stateErr == nil && strings.Contains(vs.GetVehicleSleepStatus().String(), "ASLEEP") {
+						bc.status.sleepStatus(firstCommand.Vin, SleepStatusAsleep)
+						logging.Debug("Vehicle fell asleep since it was last seen awake, waking up as requested ...")
+						if err := car.Wakeup(ctx); err != nil {
+							return nil, true, fmt.Errorf("failed to wake up car: %s", err)
+						}
+						logging.Debug("Car successfully wakeup")
+						bc.markVehicleAwake(firstCommand.Vin)
+						err = car.StartSession(ctx, []universalmessage.Domain{
+							protocol.DomainVCSEC,
+							protocol.DomainInfotainment,
+						})
+					}
+				}
+				if err != nil {
 					return nil, true, fmt.Errorf("failed to perform handshake with vehicle (B): %s", err)
 				}
 				logging.Info("Connection to vehicle established")
